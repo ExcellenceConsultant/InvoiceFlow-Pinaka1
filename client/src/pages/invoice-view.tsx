@@ -657,13 +657,7 @@ function InvoiceView() {
 
           {/* Info Grid */}
           <div className="invoice-info-grid">
-            <div className="info-section">
-              <div className="info-label">FROM:</div>
-              <div className="info-company">Excellence Consultant</div>
-              <div className="info-detail">Gitanagar, Jetpur Road</div>
-              <div className="info-detail">Gondal - 360311</div>
-              <div className="info-detail">Dist. Rajkot, State. Gujarat, India</div>
-            </div>
+            {/* FROM section removed as it will be printed on Letter head */}
 
             {/* Billed To */}
             <div className="info-section">
