@@ -657,6 +657,14 @@ function InvoiceView() {
 
           {/* Info Grid */}
           <div className="invoice-info-grid">
+            <div className="info-section">
+              <div className="info-label">FROM:</div>
+              <div className="info-company">Excellence Consultant</div>
+              <div className="info-detail">Gitanagar, Jetpur Road</div>
+              <div className="info-detail">Gondal - 360311</div>
+              <div className="info-detail">Dist. Rajkot, State. Gujarat, India</div>
+            </div>
+
             {/* Billed To */}
             <div className="info-section">
               <div className="info-label">BILLED TO:</div>
@@ -949,38 +957,22 @@ function InvoiceView() {
               <div className="notes-section">
                 <div className="notes-label">Notes:</div>
                 <div className="notes-box">
-                  {((invoice as any).notes || "")
-                    .split("\n")
-                    .filter((line: string) => line.trim())
-                    .map((line: string, idx: number) => {
-                      const cleanLine = line.replace(/^\d+\.\s*/, "").trim();
-                      return (
-                        <div className="notes-line" key={idx}>
-                          <span className="notes-number">{idx + 1}.</span>
-                          <span>{cleanLine}</span>
-                        </div>
-                      );
-                    })}
+                  <div className="notes-line">
+                    <span className="notes-number">1.</span>
+                    <span>Goods once sold will not be taken back or exchanged.</span>
+                  </div>
+                  <div className="notes-line">
+                    <span className="notes-number">2.</span>
+                    <span>Interest @18% p.a. will be charged if payment is not made within due date.</span>
+                  </div>
+                  <div className="notes-line">
+                    <span className="notes-number">3.</span>
+                    <span>Subject to Gondal Jurisdiction.</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Bank Details Section */}
-              {(invoice as any).bankDetails &&
-                (invoice as any).bankDetails.trim() && (
-                  <div className="bank-details-section">
-                    <div className="bank-details-label">BANK DETAILS:</div>
-                    <div className="bank-details-box">
-                      {((invoice as any).bankDetails || "")
-                        .split("\n")
-                        .filter((line: string) => line.trim())
-                        .map((line: string, idx: number) => (
-                          <div key={idx} style={{ marginBottom: "4px" }}>
-                            {line}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
+              {/* Bank Details Section Removed */}
 
               {/* Footer */}
               <div className="footer-section">
@@ -993,7 +985,7 @@ function InvoiceView() {
                   <span></span>
                 </div>
                 <div className="footer-company">
-                  Kitchen Xpress Overseas Inc
+                  Excellence Consultant
                 </div>
               </div>
             </>

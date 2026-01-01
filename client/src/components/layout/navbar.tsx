@@ -23,11 +23,6 @@ export default function Navbar() {
               className="flex items-center space-x-2 mr-8 flex-shrink-0"
               data-testid="link-home"
             >
-              <img
-                src={kitchenXpressLogo}
-                alt="Kitchen Xpress"
-                className="h-12 w-auto object-contain max-w-[120px]"
-              />
               <span className="text-xl font-bold text-foreground whitespace-nowrap">
                 InvoiceFlow
               </span>

@@ -63,7 +63,6 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4">
           <div className="flex items-center justify-center space-x-2">
-            <img src={kitchenXpressLogo} alt="Kitchen Xpress" className="h-12 w-auto object-contain" />
             <span className="text-2xl font-bold">InvoiceFlow</span>
           </div>
           <div>
@@ -112,7 +111,7 @@ export default function Login() {
           </form>
         </CardContent>
       </Card>
-      <p className="text-sm text-muted-foreground mt-6">© 2025 Kitchen Xpress Overseas Inc. All rights reserved.</p>
+      <p className="text-sm text-muted-foreground mt-6">© 2025 Excellence Consultant. All rights reserved.</p>
     </div>
   );
 }
