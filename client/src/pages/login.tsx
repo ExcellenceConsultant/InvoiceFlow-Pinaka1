@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import kitchenXpressLogo from "@assets/logo png _1762639803507.png";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -62,8 +61,7 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-background via-muted to-secondary/20 flex flex-col items-center justify-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4">
-          <div className="flex items-center justify-center space-x-2">
-            <img src={kitchenXpressLogo} alt="Kitchen Xpress" className="h-12 w-auto object-contain" />
+          <div className="flex items-center justify-center">
             <span className="text-2xl font-bold">InvoiceFlow</span>
           </div>
           <div>
@@ -112,7 +110,7 @@ export default function Login() {
           </form>
         </CardContent>
       </Card>
-      <p className="text-sm text-muted-foreground mt-6">© 2025 Kitchen Xpress Overseas Inc. All rights reserved.</p>
+      <p className="text-sm text-muted-foreground mt-6">© 2025 Excellence Consultant. All rights reserved.</p>
     </div>
   );
 }

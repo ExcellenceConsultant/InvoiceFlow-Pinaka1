@@ -993,7 +993,7 @@ function InvoiceView() {
                   <span></span>
                 </div>
                 <div className="footer-company">
-                  Kitchen Xpress Overseas Inc
+                  Excellence Consultant
                 </div>
               </div>
             </>

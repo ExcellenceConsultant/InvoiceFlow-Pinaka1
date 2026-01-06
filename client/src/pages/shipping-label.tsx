@@ -218,7 +218,7 @@ export default function ShippingLabel() {
       </div>
 
       <div className="shipping-label-page">
-        <div className="shipping-label-title">Kitchen Xpress Overseas Inc.</div>
+        <div className="shipping-label-title">Excellence Consultant</div>
 
         <div className="label-container">
           <div className="section-title">SHIP TO</div>

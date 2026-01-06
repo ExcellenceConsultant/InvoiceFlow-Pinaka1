@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import kitchenXpressLogo from "@assets/logo png _1762639803507.png";
 import { Bell, LogOut, TrendingUp } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
@@ -20,14 +19,9 @@ export default function Navbar() {
           <div className="flex items-center">
             <Link
               href="/"
-              className="flex items-center space-x-2 mr-8 flex-shrink-0"
+              className="flex items-center mr-8 flex-shrink-0"
               data-testid="link-home"
             >
-              <img
-                src={kitchenXpressLogo}
-                alt="Kitchen Xpress"
-                className="h-12 w-auto object-contain max-w-[120px]"
-              />
               <span className="text-xl font-bold text-foreground whitespace-nowrap">
                 InvoiceFlow
               </span>
