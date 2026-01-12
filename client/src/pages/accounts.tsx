@@ -29,7 +29,8 @@ export default function Accounts() {
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const customerFileInputRef = useRef<HTMLInputElement>(null);
+  const vendorFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -151,22 +152,22 @@ export default function Accounts() {
     return Math.max(0, totalValue); // Ensure non-negative balance for display
   };
 
-  // Export handler
-  const handleExport = async () => {
+  // Export customers handler
+  const handleExportCustomers = async () => {
     try {
       const token = localStorage.getItem("token");
       const headers: Record<string, string> = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      const response = await fetch(`/api/customers/export`, { headers });
+      const response = await fetch(`/api/customers/export/customers-only`, { headers });
       if (!response.ok) throw new Error("Export failed");
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "accounts.xlsx";
+      a.download = "customers.xlsx";
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -174,19 +175,53 @@ export default function Accounts() {
 
       toast({
         title: "Success",
-        description: "Accounts exported successfully",
+        description: "Customers exported successfully",
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to export accounts",
+        description: "Failed to export customers",
         variant: "destructive",
       });
     }
   };
 
-  // Import mutation
-  const importMutation = useMutation({
+  // Export vendors handler
+  const handleExportVendors = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const response = await fetch(`/api/customers/export/vendors-only`, { headers });
+      if (!response.ok) throw new Error("Export failed");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "vendors.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Success",
+        description: "Vendors exported successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export vendors",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Import customers mutation
+  const importCustomersMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
@@ -197,7 +232,7 @@ export default function Accounts() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const response = await fetch("/api/customers/import", {
+      const response = await fetch("/api/customers/import/customers-only", {
         method: "POST",
         headers,
         body: formData,
@@ -223,21 +258,75 @@ export default function Accounts() {
     onError: (error: any) => {
       toast({
         title: "Import Failed",
-        description: error.message || "Failed to import accounts",
+        description: error.message || "Failed to import customers",
         variant: "destructive",
       });
     },
   });
 
-  // Import handler
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Import vendors mutation
+  const importVendorsMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch("/api/customers/import/vendors-only", {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Import failed");
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      toast({
+        title: "Import Complete",
+        description: data.message,
+      });
+      if (data.errors && data.errors.length > 0) {
+        console.log("Import errors:", data.errors);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import vendors",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Import customers handler
+  const handleImportCustomers = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      importMutation.mutate(file);
+      importCustomersMutation.mutate(file);
     }
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+    if (customerFileInputRef.current) {
+      customerFileInputRef.current.value = "";
+    }
+  };
+
+  // Import vendors handler
+  const handleImportVendors = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      importVendorsMutation.mutate(file);
+    }
+    if (vendorFileInputRef.current) {
+      vendorFileInputRef.current.value = "";
     }
   };
 
@@ -470,33 +559,6 @@ export default function Accounts() {
 
           <div className="flex items-center space-x-3 mt-4 lg:mt-0">
             <Button
-              variant="secondary"
-              onClick={handleExport}
-              data-testid="button-export-accounts"
-            >
-              <Download className="mr-2" size={16} />
-              Export
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={
-                importMutation.isPending || !permissions.canManageCustomers
-              }
-              data-testid="button-import-accounts"
-            >
-              <Upload className="mr-2" size={16} />
-              {importMutation.isPending ? "Importing..." : "Import"}
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleImport}
-              style={{ display: "none" }}
-              data-testid="input-import-file"
-            />
-            <Button
               variant="outline"
               onClick={() => setShowCustomerForm(true)}
               disabled={!permissions.canManageCustomers}
@@ -534,38 +596,67 @@ export default function Accounts() {
         <TabsContent value="customers" className="space-y-6">
           <Card data-testid="customers-card">
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="flex items-center">
                   <Users className="mr-2 text-primary" size={20} />
                   Customers ({customerList.length})
                 </CardTitle>
-                {selectedCustomers.length > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-muted-foreground">
-                      {selectedCustomers.length} selected
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => setSelectedCustomers([])}
-                      data-testid="button-clear-customer-selection"
-                      title="Clear selection"
-                    >
-                      <X size={14} />
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleBulkDeleteCustomers}
-                      disabled={bulkDeleteMutation.isPending}
-                      data-testid="button-bulk-delete-customers"
-                    >
-                      <Trash2 className="mr-2" size={14} />
-                      Delete Selected
-                    </Button>
-                  </div>
-                )}
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleExportCustomers}
+                    data-testid="button-export-customers"
+                  >
+                    <Download className="mr-2" size={14} />
+                    Export Customers
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => customerFileInputRef.current?.click()}
+                    disabled={importCustomersMutation.isPending || !permissions.canManageCustomers}
+                    data-testid="button-import-customers"
+                  >
+                    <Upload className="mr-2" size={14} />
+                    {importCustomersMutation.isPending ? "Importing..." : "Import Customers"}
+                  </Button>
+                  <input
+                    ref={customerFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleImportCustomers}
+                    style={{ display: "none" }}
+                    data-testid="input-import-customers"
+                  />
+                  {selectedCustomers.length > 0 && (
+                    <>
+                      <span className="text-sm text-muted-foreground">
+                        {selectedCustomers.length} selected
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => setSelectedCustomers([])}
+                        data-testid="button-clear-customer-selection"
+                        title="Clear selection"
+                      >
+                        <X size={14} />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBulkDeleteCustomers}
+                        disabled={bulkDeleteMutation.isPending}
+                        data-testid="button-bulk-delete-customers"
+                      >
+                        <Trash2 className="mr-2" size={14} />
+                        Delete Selected
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -859,38 +950,67 @@ export default function Accounts() {
         <TabsContent value="vendors" className="space-y-6">
           <Card data-testid="vendors-card">
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="flex items-center">
                   <Building className="mr-2 text-primary" size={20} />
                   Vendors ({vendorList.length})
                 </CardTitle>
-                {selectedVendors.length > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-muted-foreground">
-                      {selectedVendors.length} selected
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => setSelectedVendors([])}
-                      data-testid="button-clear-vendor-selection"
-                      title="Clear selection"
-                    >
-                      <X size={14} />
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleBulkDeleteVendors}
-                      disabled={bulkDeleteMutation.isPending}
-                      data-testid="button-bulk-delete-vendors"
-                    >
-                      <Trash2 className="mr-2" size={14} />
-                      Delete Selected
-                    </Button>
-                  </div>
-                )}
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleExportVendors}
+                    data-testid="button-export-vendors"
+                  >
+                    <Download className="mr-2" size={14} />
+                    Export Vendors
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => vendorFileInputRef.current?.click()}
+                    disabled={importVendorsMutation.isPending || !permissions.canManageCustomers}
+                    data-testid="button-import-vendors"
+                  >
+                    <Upload className="mr-2" size={14} />
+                    {importVendorsMutation.isPending ? "Importing..." : "Import Vendors"}
+                  </Button>
+                  <input
+                    ref={vendorFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleImportVendors}
+                    style={{ display: "none" }}
+                    data-testid="input-import-vendors"
+                  />
+                  {selectedVendors.length > 0 && (
+                    <>
+                      <span className="text-sm text-muted-foreground">
+                        {selectedVendors.length} selected
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => setSelectedVendors([])}
+                        data-testid="button-clear-vendor-selection"
+                        title="Clear selection"
+                      >
+                        <X size={14} />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBulkDeleteVendors}
+                        disabled={bulkDeleteMutation.isPending}
+                        data-testid="button-bulk-delete-vendors"
+                      >
+                        <Trash2 className="mr-2" size={14} />
+                        Delete Selected
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>

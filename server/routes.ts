@@ -614,6 +614,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Export customers only to Excel
+  app.get("/api/customers/export/customers-only", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const allAccounts = await storage.getCustomers(user.userId);
+      const customersList = allAccounts.filter((c) => c.type === "customer");
+
+      const customerData = customersList.map((customer) => ({
+        Name: customer.name,
+        Email: customer.email || "",
+        Phone: customer.phone || "",
+        Street: customer.address?.street || "",
+        City: customer.address?.city || "",
+        State: customer.address?.state || "",
+        ZipCode: customer.address?.zipCode || "",
+        Country: customer.address?.country || "",
+        IsActive: customer.isActive !== false ? "Yes" : "No",
+        QuickBooksCustomerId: customer.quickbooksCustomerId || "",
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(customerData);
+      XLSX.utils.book_append_sheet(wb, ws, "Customers");
+      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      res.setHeader("Content-Disposition", `attachment; filename="customers.xlsx"`);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.send(buffer);
+    } catch (error) {
+      console.error("Export error:", error);
+      res.status(500).json({ message: "Failed to export customers" });
+    }
+  });
+
+  // Export vendors only to Excel
+  app.get("/api/customers/export/vendors-only", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const allAccounts = await storage.getCustomers(user.userId);
+      const vendorsList = allAccounts.filter((c) => c.type === "vendor");
+
+      const vendorData = vendorsList.map((vendor) => ({
+        Name: vendor.name,
+        Email: vendor.email || "",
+        Phone: vendor.phone || "",
+        Street: vendor.address?.street || "",
+        City: vendor.address?.city || "",
+        State: vendor.address?.state || "",
+        ZipCode: vendor.address?.zipCode || "",
+        Country: vendor.address?.country || "",
+        IsActive: vendor.isActive !== false ? "Yes" : "No",
+        QuickBooksCustomerId: vendor.quickbooksCustomerId || "",
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(vendorData);
+      XLSX.utils.book_append_sheet(wb, ws, "Vendors");
+      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      res.setHeader("Content-Disposition", `attachment; filename="vendors.xlsx"`);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.send(buffer);
+    } catch (error) {
+      console.error("Export error:", error);
+      res.status(500).json({ message: "Failed to export vendors" });
+    }
+  });
+
+  // Import customers only from Excel
+  app.post(
+    "/api/customers/import/customers-only",
+    isAuthenticated,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "File is required" });
+        }
+
+        const user = (req as any).user;
+        const userId = user.userId;
+        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        const results = { success: 0, failed: 0, errors: [] as string[] };
+
+        for (let i = 0; i < data.length; i++) {
+          const row: any = data[i];
+          try {
+            let address = null;
+            if (row.Street || row.City || row.State || row.ZipCode || row.Country) {
+              address = {
+                street: row.Street || "",
+                city: row.City || "",
+                state: row.State || "",
+                zipCode: row.ZipCode || "",
+                country: row.Country || "",
+              };
+            }
+
+            const isActiveStr = (row.IsActive || "").toString().toLowerCase();
+            const isActive = isActiveStr === "no" ? false : true;
+
+            const customerData = {
+              userId,
+              name: row.Name,
+              email: row.Email || null,
+              phone: row.Phone || null,
+              address,
+              type: "customer" as const,
+              isActive,
+              quickbooksCustomerId: row.QuickBooksCustomerId || null,
+            };
+
+            const validation = insertCustomerSchema.extend({ userId: z.string() }).safeParse(customerData);
+            if (!validation.success) {
+              results.failed++;
+              results.errors.push(`Row ${i + 2}: ${validation.error.errors.map((e) => e.message).join(", ")}`);
+              continue;
+            }
+
+            await storage.createCustomer(validation.data);
+            results.success++;
+          } catch (error: any) {
+            results.failed++;
+            results.errors.push(`Row ${i + 2}: ${error.message}`);
+          }
+        }
+
+        res.json({ message: `Customers import completed: ${results.success} succeeded, ${results.failed} failed`, ...results });
+      } catch (error) {
+        console.error("Import error:", error);
+        res.status(500).json({ message: "Failed to import customers" });
+      }
+    },
+  );
+
+  // Import vendors only from Excel
+  app.post(
+    "/api/customers/import/vendors-only",
+    isAuthenticated,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "File is required" });
+        }
+
+        const user = (req as any).user;
+        const userId = user.userId;
+        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+
+        const results = { success: 0, failed: 0, errors: [] as string[] };
+
+        for (let i = 0; i < data.length; i++) {
+          const row: any = data[i];
+          try {
+            let address = null;
+            if (row.Street || row.City || row.State || row.ZipCode || row.Country) {
+              address = {
+                street: row.Street || "",
+                city: row.City || "",
+                state: row.State || "",
+                zipCode: row.ZipCode || "",
+                country: row.Country || "",
+              };
+            }
+
+            const isActiveStr = (row.IsActive || "").toString().toLowerCase();
+            const isActive = isActiveStr === "no" ? false : true;
+
+            const vendorData = {
+              userId,
+              name: row.Name,
+              email: row.Email || null,
+              phone: row.Phone || null,
+              address,
+              type: "vendor" as const,
+              isActive,
+              quickbooksCustomerId: row.QuickBooksCustomerId || null,
+            };
+
+            const validation = insertCustomerSchema.extend({ userId: z.string() }).safeParse(vendorData);
+            if (!validation.success) {
+              results.failed++;
+              results.errors.push(`Row ${i + 2}: ${validation.error.errors.map((e) => e.message).join(", ")}`);
+              continue;
+            }
+
+            await storage.createCustomer(validation.data);
+            results.success++;
+          } catch (error: any) {
+            results.failed++;
+            results.errors.push(`Row ${i + 2}: ${error.message}`);
+          }
+        }
+
+        res.json({ message: `Vendors import completed: ${results.success} succeeded, ${results.failed} failed`, ...results });
+      } catch (error) {
+        console.error("Import error:", error);
+        res.status(500).json({ message: "Failed to import vendors" });
+      }
+    },
+  );
+
   // Inventory movement report - Must be before other product routes
   app.get(
     "/api/reports/inventory-movement",
