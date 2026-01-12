@@ -730,7 +730,7 @@ function InvoiceView() {
               </div>
               <div className="info-detail">
                 <strong>Payment Term</strong> : Net{" "}
-                {(invoice as any).paymentTerms || 30}
+                {(invoice as any).paymentTerms || 30} days
               </div>
               <div className="info-detail">
                 <strong>Due Date</strong> :{" "}
