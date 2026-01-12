@@ -358,24 +358,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Export customers/vendors to Excel
+  // Export customers/vendors to Excel (separate sheets with all fields)
   app.get("/api/customers/export", isAuthenticated, async (req, res) => {
     try {
       const user = (req as any).user;
-      const customers = await storage.getCustomers(user.userId);
+      const allAccounts = await storage.getCustomers(user.userId);
 
-      // Prepare data for Excel
-      const excelData = customers.map((customer) => ({
+      // Separate customers and vendors
+      const customersList = allAccounts.filter((c) => c.type === "customer");
+      const vendorsList = allAccounts.filter((c) => c.type === "vendor");
+
+      // Prepare customer data for Excel with all fields separated
+      const customerData = customersList.map((customer) => ({
         Name: customer.name,
         Email: customer.email || "",
         Phone: customer.phone || "",
-        Address: customer.address ? JSON.stringify(customer.address) : "",
+        Street: customer.address?.street || "",
+        City: customer.address?.city || "",
+        State: customer.address?.state || "",
+        ZipCode: customer.address?.zipCode || "",
+        Country: customer.address?.country || "",
+        IsActive: customer.isActive !== false ? "Yes" : "No",
+        QuickBooksCustomerId: customer.quickbooksCustomerId || "",
       }));
 
-      // Create workbook
+      // Prepare vendor data for Excel with all fields separated
+      const vendorData = vendorsList.map((vendor) => ({
+        Name: vendor.name,
+        Email: vendor.email || "",
+        Phone: vendor.phone || "",
+        Street: vendor.address?.street || "",
+        City: vendor.address?.city || "",
+        State: vendor.address?.state || "",
+        ZipCode: vendor.address?.zipCode || "",
+        Country: vendor.address?.country || "",
+        IsActive: vendor.isActive !== false ? "Yes" : "No",
+        QuickBooksCustomerId: vendor.quickbooksCustomerId || "",
+      }));
+
+      // Create workbook with separate sheets
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(excelData);
-      XLSX.utils.book_append_sheet(wb, ws, "Accounts");
+      
+      // Add Customers sheet
+      const customersWs = XLSX.utils.json_to_sheet(customerData);
+      XLSX.utils.book_append_sheet(wb, customersWs, "Customers");
+      
+      // Add Vendors sheet
+      const vendorsWs = XLSX.utils.json_to_sheet(vendorData);
+      XLSX.utils.book_append_sheet(wb, vendorsWs, "Vendors");
 
       // Generate buffer
       const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
@@ -397,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Import customers/vendors from Excel/CSV
+  // Import customers/vendors from Excel/CSV (supports separate sheets with all fields)
   app.post(
     "/api/customers/import",
     isAuthenticated,
@@ -413,9 +443,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Parse Excel/CSV file
         const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
 
         const results = {
           success: 0,
@@ -423,52 +450,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errors: [] as string[],
         };
 
-        // Process each row
-        for (let i = 0; i < data.length; i++) {
-          const row: any = data[i];
+        // Helper function to process rows from a sheet
+        const processSheet = async (sheetName: string, type: "customer" | "vendor") => {
+          const worksheet = workbook.Sheets[sheetName];
+          if (!worksheet) return;
 
-          try {
-            // Parse address if it exists
-            let address = null;
+          const data = XLSX.utils.sheet_to_json(worksheet);
 
-            if (row.Address) {
-              try {
-                address = JSON.parse(row.Address);
-              } catch {
-                address = null;
+          for (let i = 0; i < data.length; i++) {
+            const row: any = data[i];
+
+            try {
+              // Build address from separate columns or parse JSON if Address column exists
+              let address = null;
+
+              // Check for separate address columns first
+              if (row.Street || row.City || row.State || row.ZipCode || row.Country) {
+                address = {
+                  street: row.Street || "",
+                  city: row.City || "",
+                  state: row.State || "",
+                  zipCode: row.ZipCode || "",
+                  country: row.Country || "",
+                };
+              } else if (row.Address) {
+                // Fallback to JSON parsing for backwards compatibility
+                try {
+                  address = JSON.parse(row.Address);
+                } catch {
+                  address = null;
+                }
               }
-            }
 
-            // Validate and create customer
-            const customerData = {
-              userId,
-              name: row.Name,
-              email: row.Email || null,
-              phone: row.Phone || null,
-              address,
-            };
+              // Parse isActive field
+              const isActiveStr = (row.IsActive || "").toString().toLowerCase();
+              const isActive = isActiveStr === "no" ? false : true;
 
-            const validation = insertCustomerSchema
-              .extend({
-                userId: z.string(),
-              })
-              .safeParse(customerData);
+              // Validate and create customer/vendor
+              const customerData = {
+                userId,
+                name: row.Name,
+                email: row.Email || null,
+                phone: row.Phone || null,
+                address,
+                type,
+                isActive,
+                quickbooksCustomerId: row.QuickBooksCustomerId || null,
+              };
 
-            if (!validation.success) {
+              const validation = insertCustomerSchema
+                .extend({
+                  userId: z.string(),
+                })
+                .safeParse(customerData);
+
+              if (!validation.success) {
+                results.failed++;
+                results.errors.push(
+                  `${sheetName} Row ${i + 2}: ${validation.error.errors
+                    .map((e) => e.message)
+                    .join(", ")}`,
+                );
+                continue;
+              }
+
+              await storage.createCustomer(validation.data);
+              results.success++;
+            } catch (error: any) {
               results.failed++;
-              results.errors.push(
-                `Row ${i + 2}: ${validation.error.errors
-                  .map((e) => e.message)
-                  .join(", ")}`,
-              );
-              continue;
+              results.errors.push(`${sheetName} Row ${i + 2}: ${error.message}`);
             }
+          }
+        };
 
-            await storage.createCustomer(validation.data);
-            results.success++;
-          } catch (error: any) {
-            results.failed++;
-            results.errors.push(`Row ${i + 2}: ${error.message}`);
+        // Process Customers sheet if it exists
+        if (workbook.SheetNames.includes("Customers")) {
+          await processSheet("Customers", "customer");
+        }
+
+        // Process Vendors sheet if it exists
+        if (workbook.SheetNames.includes("Vendors")) {
+          await processSheet("Vendors", "vendor");
+        }
+
+        // Fallback: if no Customers/Vendors sheets, process the first sheet as before (backwards compatibility)
+        if (!workbook.SheetNames.includes("Customers") && !workbook.SheetNames.includes("Vendors")) {
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const data = XLSX.utils.sheet_to_json(worksheet);
+
+          for (let i = 0; i < data.length; i++) {
+            const row: any = data[i];
+
+            try {
+              // Build address from separate columns or parse JSON
+              let address = null;
+
+              if (row.Street || row.City || row.State || row.ZipCode || row.Country) {
+                address = {
+                  street: row.Street || "",
+                  city: row.City || "",
+                  state: row.State || "",
+                  zipCode: row.ZipCode || "",
+                  country: row.Country || "",
+                };
+              } else if (row.Address) {
+                try {
+                  address = JSON.parse(row.Address);
+                } catch {
+                  address = null;
+                }
+              }
+
+              // Parse isActive and type fields
+              const isActiveStr = (row.IsActive || "").toString().toLowerCase();
+              const isActive = isActiveStr === "no" ? false : true;
+              const type = (row.Type || "").toString().toLowerCase() === "vendor" ? "vendor" : "customer";
+
+              const customerData = {
+                userId,
+                name: row.Name,
+                email: row.Email || null,
+                phone: row.Phone || null,
+                address,
+                type,
+                isActive,
+                quickbooksCustomerId: row.QuickBooksCustomerId || null,
+              };
+
+              const validation = insertCustomerSchema
+                .extend({
+                  userId: z.string(),
+                })
+                .safeParse(customerData);
+
+              if (!validation.success) {
+                results.failed++;
+                results.errors.push(
+                  `Row ${i + 2}: ${validation.error.errors
+                    .map((e) => e.message)
+                    .join(", ")}`,
+                );
+                continue;
+              }
+
+              await storage.createCustomer(validation.data);
+              results.success++;
+            } catch (error: any) {
+              results.failed++;
+              results.errors.push(`Row ${i + 2}: ${error.message}`);
+            }
           }
         }
 
