@@ -32,10 +32,7 @@ const DEFAULT_NOTES = `1. All matters related to this invoice or the goods shall
 3. I understand and accept that cheque image deposited through ACH debits are valid mode of payment.
 4. Final Sale`;
 
-const DEFAULT_BANK_DETAILS = `BANK NAME : JPMORGAN CHASE BANK
-BANK ADDRESS : P O Box 182051, Columbus, OH 43218 - 2051.
-ACCOUNT NUMBER : 000000589988131
-ROUTING NUMBER : 083000137`;
+const DEFAULT_BANK_DETAILS = ``;
 
 const invoiceSchema = z
   .object({
