@@ -702,32 +702,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const results = { success: 0, failed: 0, errors: [] as string[] };
 
+        // Helper to safely convert Excel values to strings
+        const toStr = (val: any) => val !== undefined && val !== null ? String(val).trim() : "";
+
         for (let i = 0; i < data.length; i++) {
           const row: any = data[i];
           try {
-            let address = null;
-            if (row.Street || row.City || row.State || row.ZipCode || row.Country) {
-              address = {
-                street: row.Street || "",
-                city: row.City || "",
-                state: row.State || "",
-                zipCode: row.ZipCode || "",
-                country: row.Country || "",
-              };
+            const name = toStr(row.Name);
+            if (!name) {
+              results.failed++;
+              results.errors.push(`Row ${i + 2}: Name is required`);
+              continue;
             }
 
-            const isActiveStr = (row.IsActive || "").toString().toLowerCase();
+            let address = null;
+            const street = toStr(row.Street);
+            const city = toStr(row.City);
+            const state = toStr(row.State);
+            const zipCode = toStr(row.ZipCode);
+            const country = toStr(row.Country);
+            if (street || city || state || zipCode || country) {
+              address = { street, city, state, zipCode, country };
+            }
+
+            const isActiveStr = toStr(row.IsActive).toLowerCase();
             const isActive = isActiveStr === "no" ? false : true;
 
             const customerData = {
               userId,
-              name: row.Name,
-              email: row.Email || null,
-              phone: row.Phone || null,
+              name,
+              email: toStr(row.Email) || null,
+              phone: toStr(row.Phone) || null,
               address,
               type: "customer" as const,
               isActive,
-              quickbooksCustomerId: row.QuickBooksCustomerId || null,
+              quickbooksCustomerId: toStr(row.QuickBooksCustomerId) || null,
             };
 
             const validation = insertCustomerSchema.extend({ userId: z.string() }).safeParse(customerData);
@@ -773,32 +782,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const results = { success: 0, failed: 0, errors: [] as string[] };
 
+        // Helper to safely convert Excel values to strings
+        const toStr = (val: any) => val !== undefined && val !== null ? String(val).trim() : "";
+
         for (let i = 0; i < data.length; i++) {
           const row: any = data[i];
           try {
-            let address = null;
-            if (row.Street || row.City || row.State || row.ZipCode || row.Country) {
-              address = {
-                street: row.Street || "",
-                city: row.City || "",
-                state: row.State || "",
-                zipCode: row.ZipCode || "",
-                country: row.Country || "",
-              };
+            const name = toStr(row.Name);
+            if (!name) {
+              results.failed++;
+              results.errors.push(`Row ${i + 2}: Name is required`);
+              continue;
             }
 
-            const isActiveStr = (row.IsActive || "").toString().toLowerCase();
+            let address = null;
+            const street = toStr(row.Street);
+            const city = toStr(row.City);
+            const state = toStr(row.State);
+            const zipCode = toStr(row.ZipCode);
+            const country = toStr(row.Country);
+            if (street || city || state || zipCode || country) {
+              address = { street, city, state, zipCode, country };
+            }
+
+            const isActiveStr = toStr(row.IsActive).toLowerCase();
             const isActive = isActiveStr === "no" ? false : true;
 
             const vendorData = {
               userId,
-              name: row.Name,
-              email: row.Email || null,
-              phone: row.Phone || null,
+              name,
+              email: toStr(row.Email) || null,
+              phone: toStr(row.Phone) || null,
               address,
               type: "vendor" as const,
               isActive,
-              quickbooksCustomerId: row.QuickBooksCustomerId || null,
+              quickbooksCustomerId: toStr(row.QuickBooksCustomerId) || null,
             };
 
             const validation = insertCustomerSchema.extend({ userId: z.string() }).safeParse(vendorData);
