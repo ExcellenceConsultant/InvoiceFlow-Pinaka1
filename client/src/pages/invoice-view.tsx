@@ -758,10 +758,10 @@ function InvoiceView() {
                   <th style={{ width: "10%", textAlign: "center" }}>
                     Qty
                     <br />
-                    (Carton)
+                    (Unit)
                   </th>
                   <th style={{ width: "13%", textAlign: "center" }}>
-                    Rate per Carton
+                    Rate per Unit
                   </th>
                   <th style={{ width: "13%", textAlign: "center" }}>
                     Total
