@@ -881,7 +881,7 @@ function InvoiceView() {
                 {/* Left side - Weights and Amount in words */}
                 <div className="summary-left">
                   <div>
-                    <strong>Total Carton:</strong> {totalCartons}
+                    <strong>Total Units:</strong> {totalCartons}
                   </div>
                   <div>
                     <strong>Net Weight LBS:</strong> {netWeightLbs.toFixed(0)}{" "}
