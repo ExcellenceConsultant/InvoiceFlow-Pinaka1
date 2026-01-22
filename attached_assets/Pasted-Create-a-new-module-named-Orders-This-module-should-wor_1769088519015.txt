@@ -1,0 +1,71 @@
+Create a new module named **Orders**.
+
+This module should work EXACTLY like the existing **Business** module
+(Invoices & Bills), but for Orders.
+
+Requirements:
+
+1. Module Name & Routing
+   - Create a new page/module called **Orders**
+   - Page title: “Orders”
+   - Subtitle: “Manage sales orders and purchase orders”
+
+2. Order Types
+   - Sales Order (SO)
+   - Purchase Order (PO)
+
+3. Tabs
+   - Two tabs at the top:
+     - “Sales Orders”
+     - “Purchase Orders”
+   - Sales Orders = receivable-like flow
+   - Purchase Orders = payable-like flow
+
+4. Listing Behavior
+   - Use ONE shared table (same pattern as Business module)
+   - Filters, sorting, search, date filter, bulk select should work the same
+   - API logic should follow the same structure as invoices/bills
+   - No duplication of tables
+
+5. Create Actions (IMPORTANT)
+   - When Sales Orders tab is active → show **Create Sales Order** button
+   - When Purchase Orders tab is active → show **Create Purchase Order** button
+   - Button text must change dynamically based on active tab
+
+6. Forms (Separated)
+   - Create `SalesOrderForm`
+   - Create `PurchaseOrderForm`
+   - Even if logic overlaps, DO NOT reuse one form
+   - Editing should open the correct form based on order type
+
+7. Rendering Logic
+   - If activeTab === "SO" → SalesOrderForm
+   - If activeTab === "PO" → PurchaseOrderForm
+
+8. Permissions
+   - Respect separate permissions:
+     - canCreateSalesOrder
+     - canEditSalesOrder
+     - canCreatePurchaseOrder
+     - canEditPurchaseOrder
+
+9. Data Model (Frontend expectation)
+   - orderType: "sales" | "purchase"
+   - orderNumber
+   - orderDate
+   - customerId (Sales Order)
+   - vendorId (Purchase Order)
+   - totalCartons
+   - totalAmount
+   - status (draft, approved, closed, cancelled)
+
+10. UI Consistency
+   - Follow same UI components, badges, buttons, layout as Business module
+   - Reuse table styles, filters, icons
+   - Do NOT break existing Business module
+
+Deliverables:
+- New Orders page component
+- SalesOrderForm component
+- PurchaseOrderForm component
+- Clean, readable, minimal changes

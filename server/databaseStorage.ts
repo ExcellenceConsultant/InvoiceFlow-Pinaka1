@@ -4,6 +4,8 @@ import {
   customers,
   invoiceLineItems,
   invoices,
+  orders,
+  orderLineItems,
   products,
   productSchemes,
   productVariants,
@@ -17,12 +19,16 @@ import {
   type InsertCustomer,
   type InsertInvoice,
   type InsertInvoiceLineItem,
+  type InsertOrder,
+  type InsertOrderLineItem,
   type InsertProduct,
   type InsertProductScheme,
   type InsertProductVariant,
   type InsertUser,
   type Invoice,
   type InvoiceLineItem,
+  type Order,
+  type OrderLineItem,
   type Product,
   type ProductScheme,
   type ProductVariant,
@@ -659,6 +665,91 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(systemSettings)
       .where(eq(systemSettings.key, key));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Orders
+  async getOrders(userId: string): Promise<Order[]> {
+    await this.ensureInitialized();
+    return db
+      .select()
+      .from(orders)
+      .orderBy(asc(orders.orderNumber));
+  }
+
+  async getOrder(id: string): Promise<Order | undefined> {
+    await this.ensureInitialized();
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    return order;
+  }
+
+  async createOrder(orderData: InsertOrder & { userId: string }): Promise<Order> {
+    await this.ensureInitialized();
+    const [order] = await db.insert(orders).values(orderData).returning();
+    return order;
+  }
+
+  async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
+    await this.ensureInitialized();
+    const [order] = await db
+      .update(orders)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(orders.id, id))
+      .returning();
+    return order;
+  }
+
+  async updateOrderStatus(id: string, status: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db
+      .update(orders)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(orders.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async deleteOrder(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db.delete(orders).where(eq(orders.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Order Line Items
+  async getOrderLineItems(orderId: string): Promise<OrderLineItem[]> {
+    await this.ensureInitialized();
+    return db
+      .select()
+      .from(orderLineItems)
+      .where(eq(orderLineItems.orderId, orderId));
+  }
+
+  async getAllOrderLineItems(): Promise<OrderLineItem[]> {
+    await this.ensureInitialized();
+    return db.select().from(orderLineItems);
+  }
+
+  async createOrderLineItem(lineItemData: InsertOrderLineItem): Promise<OrderLineItem> {
+    await this.ensureInitialized();
+    const [lineItem] = await db
+      .insert(orderLineItems)
+      .values(lineItemData)
+      .returning();
+    return lineItem;
+  }
+
+  async deleteOrderLineItem(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db
+      .delete(orderLineItems)
+      .where(eq(orderLineItems.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async deleteOrderLineItemsByOrderId(orderId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db
+      .delete(orderLineItems)
+      .where(eq(orderLineItems.orderId, orderId));
     return (result.rowCount || 0) > 0;
   }
 }

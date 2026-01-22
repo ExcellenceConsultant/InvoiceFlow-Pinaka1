@@ -218,6 +218,55 @@ export const creditMemoLineItems = pgTable("credit_memo_line_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Orders table
+export const orders = pgTable("orders", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  orderNumber: text("order_number").notNull(),
+  customerId: varchar("customer_id").references(() => customers.id),
+  purchaseOrder: text("purchase_order"),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  freight: decimal("freight", { precision: 10, scale: 2 })
+    .default("0")
+    .notNull(),
+  discount: decimal("discount", { precision: 10, scale: 2 })
+    .default("0")
+    .notNull(),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("draft"), // draft, approved, closed, cancelled
+  orderType: text("order_type").notNull().default("sales"), // sales (SO), purchase (PO)
+  orderDate: timestamp("order_date").notNull(),
+  expectedDate: timestamp("expected_date"),
+  notes: text("notes"),
+  userId: varchar("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const orderLineItems = pgTable("order_line_items", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").references(() => orders.id),
+  productId: varchar("product_id").references(() => products.id),
+  variantId: varchar("variant_id").references(() => productVariants.id),
+  description: text("description").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+  productCode: text("product_code"),
+  cartoonBarcode: text("cartoon_barcode"),
+  packingSize: text("packing_size"),
+  grossWeightKgs: decimal("gross_weight_kgs", { precision: 10, scale: 3 }),
+  netWeightKgs: decimal("net_weight_kgs", { precision: 10, scale: 3 }),
+  category: text("category"),
+  isFreeFromScheme: boolean("is_free_from_scheme").default(false),
+  isSchemeDescription: boolean("is_scheme_description").default(false),
+  schemeId: varchar("scheme_id").references(() => productSchemes.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -302,6 +351,29 @@ export const insertCreditMemoLineItemSchema = createInsertSchema(
   createdAt: true,
 });
 
+export const insertOrderSchema = createInsertSchema(orders)
+  .omit({
+    id: true,
+    userId: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    orderDate: z.string().transform((str) => new Date(str)),
+    expectedDate: z
+      .string()
+      .optional()
+      .transform((str) => (str ? new Date(str) : null)),
+    purchaseOrder: z.union([z.string(), z.null()]).optional(),
+  });
+
+export const insertOrderLineItemSchema = createInsertSchema(
+  orderLineItems,
+).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -323,3 +395,7 @@ export type CreditMemoLineItem = typeof creditMemoLineItems.$inferSelect;
 export type InsertCreditMemoLineItem = z.infer<
   typeof insertCreditMemoLineItemSchema
 >;
+export type Order = typeof orders.$inferSelect;
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+export type OrderLineItem = typeof orderLineItems.$inferSelect;
+export type InsertOrderLineItem = z.infer<typeof insertOrderLineItemSchema>;

@@ -17,6 +17,10 @@ import {
   type InsertCreditMemo,
   type CreditMemoLineItem,
   type InsertCreditMemoLineItem,
+  type Order,
+  type InsertOrder,
+  type OrderLineItem,
+  type InsertOrderLineItem,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -122,6 +126,21 @@ export interface IStorage {
   getSystemSetting(key: string): Promise<any>;
   setSystemSetting(key: string, value: any): Promise<void>;
   deleteSystemSetting(key: string): Promise<boolean>;
+
+  // Orders
+  getOrders(userId: string): Promise<Order[]>;
+  getOrder(id: string): Promise<Order | undefined>;
+  createOrder(order: InsertOrder & { userId: string }): Promise<Order>;
+  updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined>;
+  updateOrderStatus(id: string, status: string): Promise<boolean>;
+  deleteOrder(id: string): Promise<boolean>;
+
+  // Order Line Items
+  getOrderLineItems(orderId: string): Promise<OrderLineItem[]>;
+  getAllOrderLineItems(): Promise<OrderLineItem[]>;
+  createOrderLineItem(lineItem: InsertOrderLineItem): Promise<OrderLineItem>;
+  deleteOrderLineItem(id: string): Promise<boolean>;
+  deleteOrderLineItemsByOrderId(orderId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -699,6 +718,94 @@ export class MemStorage implements IStorage {
 
   async deleteSystemSetting(key: string): Promise<boolean> {
     return this.systemSettings.delete(key);
+  }
+
+  // Orders
+  private orders: Map<string, Order> = new Map();
+  private orderLineItems: Map<string, OrderLineItem> = new Map();
+
+  async getOrders(userId: string): Promise<Order[]> {
+    return Array.from(this.orders.values()).filter((o) => o.userId === userId);
+  }
+
+  async getOrder(id: string): Promise<Order | undefined> {
+    return this.orders.get(id);
+  }
+
+  async createOrder(orderData: InsertOrder & { userId: string }): Promise<Order> {
+    const id = randomUUID();
+    const order: Order = {
+      ...orderData,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Order;
+    this.orders.set(id, order);
+    return order;
+  }
+
+  async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
+    const order = this.orders.get(id);
+    if (order) {
+      const updated = { ...order, ...updates, updatedAt: new Date() };
+      this.orders.set(id, updated);
+      return updated;
+    }
+    return undefined;
+  }
+
+  async updateOrderStatus(id: string, status: string): Promise<boolean> {
+    const order = this.orders.get(id);
+    if (order) {
+      order.status = status;
+      order.updatedAt = new Date();
+      this.orders.set(id, order);
+      return true;
+    }
+    return false;
+  }
+
+  async deleteOrder(id: string): Promise<boolean> {
+    return this.orders.delete(id);
+  }
+
+  async getOrderLineItems(orderId: string): Promise<OrderLineItem[]> {
+    return Array.from(this.orderLineItems.values()).filter(
+      (item) => item.orderId === orderId,
+    );
+  }
+
+  async getAllOrderLineItems(): Promise<OrderLineItem[]> {
+    return Array.from(this.orderLineItems.values());
+  }
+
+  async createOrderLineItem(lineItemData: InsertOrderLineItem): Promise<OrderLineItem> {
+    const id = randomUUID();
+    const lineItem: OrderLineItem = {
+      ...lineItemData,
+      grossWeightKgs: (lineItemData as any).grossWeightKgs || null,
+      netWeightKgs: (lineItemData as any).netWeightKgs || null,
+      category: (lineItemData as any).category || null,
+      isFreeFromScheme: lineItemData.isFreeFromScheme || false,
+      isSchemeDescription: lineItemData.isSchemeDescription || false,
+      schemeId: lineItemData.schemeId || null,
+      id,
+      createdAt: new Date(),
+    };
+    this.orderLineItems.set(id, lineItem);
+    return lineItem;
+  }
+
+  async deleteOrderLineItem(id: string): Promise<boolean> {
+    return this.orderLineItems.delete(id);
+  }
+
+  async deleteOrderLineItemsByOrderId(orderId: string): Promise<boolean> {
+    const itemsToDelete = Array.from(this.orderLineItems.entries())
+      .filter(([_, item]) => item.orderId === orderId)
+      .map(([id]) => id);
+    itemsToDelete.forEach((id) => this.orderLineItems.delete(id));
+    return true;
   }
 }
 

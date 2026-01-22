@@ -49,5 +49,17 @@ export function usePermissions() {
     
     // Profitability
     canViewProfitInvoice: role === "super_admin",
+    
+    // Sales Orders (SO)
+    canCreateSalesOrder: role === "super_admin" || role === "admin",
+    canEditSalesOrder: role === "super_admin" || role === "admin",
+    canDeleteSalesOrder: role === "super_admin" || role === "admin",
+    canViewSalesOrders: true,
+    
+    // Purchase Orders (PO)
+    canCreatePurchaseOrder: role === "super_admin" || role === "admin",
+    canEditPurchaseOrder: role === "super_admin" || role === "admin",
+    canDeletePurchaseOrder: role === "super_admin" || role === "admin",
+    canViewPurchaseOrders: true,
   };
 }
