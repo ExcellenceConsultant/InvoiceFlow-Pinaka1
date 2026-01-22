@@ -4,6 +4,8 @@ import {
   insertCustomerSchema,
   insertInvoiceLineItemSchema,
   insertInvoiceSchema,
+  insertOrderLineItemSchema,
+  insertOrderSchema,
   insertProductSchema,
   insertProductSchemeSchema,
   insertProductVariantSchema,
@@ -4713,6 +4715,265 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
+  // ============= ORDERS API =============
+  
+  // Get all orders
+  app.get("/api/orders", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const orders = await storage.getOrders(user.userId);
+      
+      // Fetch all line items to calculate total cartons per order
+      const allLineItems = await storage.getAllOrderLineItems();
+      
+      // Create a map of order ID to total cartons
+      const cartonsByOrder = new Map<string, number>();
+      for (const item of allLineItems) {
+        if (item.orderId) {
+          const currentTotal = cartonsByOrder.get(item.orderId) || 0;
+          cartonsByOrder.set(item.orderId, currentTotal + (item.quantity || 0));
+        }
+      }
+      
+      // Add totalCartons to each order
+      const ordersWithCartons = orders.map(order => ({
+        ...order,
+        totalCartons: cartonsByOrder.get(order.id) || 0,
+      }));
+      
+      res.json(ordersWithCartons);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
+  // Get next order number for sales orders
+  app.get("/api/orders/next-number", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const orders = await storage.getOrders(user.userId);
+
+      // Filter for sales orders only
+      const salesOrders = orders.filter(
+        (ord) => ord.orderType === "sales",
+      );
+
+      if (salesOrders.length === 0) {
+        return res.json({ nextNumber: "SO-1" });
+      }
+
+      // Extract numeric order numbers and find the maximum
+      const numericOrderNumbers = salesOrders
+        .map((ord) => {
+          const orderNumber = ord.orderNumber.trim();
+          const numericPart = orderNumber.replace(/\D/g, "");
+          return parseInt(numericPart, 10);
+        })
+        .filter((num) => !isNaN(num));
+
+      if (numericOrderNumbers.length === 0) {
+        return res.json({ nextNumber: "SO-1" });
+      }
+
+      const maxNumber = Math.max(...numericOrderNumbers);
+      const nextNumber = maxNumber + 1;
+
+      res.json({ nextNumber: `SO-${nextNumber}` });
+    } catch (error) {
+      console.error("Error getting next order number:", error);
+      res.status(500).json({ message: "Failed to get next order number" });
+    }
+  });
+
+  // Create order
+  app.post("/api/orders", isAuthenticated, async (req, res) => {
+    try {
+      console.log("Creating order with data:", JSON.stringify(req.body, null, 2));
+      const { order, lineItems } = req.body;
+
+      if (!order || !lineItems) {
+        console.error("Missing order or lineItems in request body");
+        return res
+          .status(400)
+          .json({ message: "Order and line items are required" });
+      }
+
+      const orderValidation = insertOrderSchema.safeParse(order);
+
+      if (!orderValidation.success) {
+        console.error("Order validation failed:", orderValidation.error.errors);
+        return res.status(400).json({
+          message: "Invalid order data",
+          errors: orderValidation.error.errors,
+        });
+      }
+
+      const user = (req as any).user;
+      const orderData = {
+        ...orderValidation.data,
+        userId: user.userId,
+      };
+
+      // Create order
+      const createdOrder = await storage.createOrder(orderData);
+
+      // Create line items
+      const createdLineItems = [];
+      for (const item of lineItems) {
+        if (!item.productId || item.productId.trim() === "") {
+          console.log("Skipping line item with empty productId:", item);
+          continue;
+        }
+
+        const lineItemValidation = insertOrderLineItemSchema.safeParse({
+          ...item,
+          orderId: createdOrder.id,
+        });
+
+        if (lineItemValidation.success) {
+          const lineItem = await storage.createOrderLineItem(
+            lineItemValidation.data,
+          );
+          createdLineItems.push(lineItem);
+        } else {
+          console.error("Line item validation failed:", lineItemValidation.error.errors);
+        }
+      }
+
+      res.status(201).json({
+        ...createdOrder,
+        lineItems: createdLineItems,
+      });
+    } catch (error) {
+      console.error("Error creating order:", error);
+      res.status(500).json({ message: "Failed to create order" });
+    }
+  });
+
+  // Get single order
+  app.get("/api/orders/:id", isAuthenticated, async (req, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (order) {
+        res.json(order);
+      } else {
+        res.status(404).json({ message: "Order not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch order" });
+    }
+  });
+
+  // Get order line items
+  app.get("/api/orders/:id/line-items", isAuthenticated, async (req, res) => {
+    try {
+      const lineItems = await storage.getOrderLineItems(req.params.id);
+      res.json(lineItems);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch order line items" });
+    }
+  });
+
+  // Delete order
+  app.delete("/api/orders/:id", isAuthenticated, async (req, res) => {
+    try {
+      const orderId = req.params.id;
+
+      // First delete all line items for this order
+      await storage.deleteOrderLineItemsByOrderId(orderId);
+
+      // Then delete the order
+      const deleted = await storage.deleteOrder(orderId);
+
+      if (deleted) {
+        res.json({ message: "Order deleted successfully" });
+      } else {
+        res.status(404).json({ message: "Order not found" });
+      }
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      res.status(500).json({ message: "Failed to delete order" });
+    }
+  });
+
+  // Update order
+  app.patch("/api/orders/:id", isAuthenticated, async (req, res) => {
+    try {
+      console.log("Updating order with data:", JSON.stringify(req.body, null, 2));
+      const { order, lineItems } = req.body;
+      const orderId = req.params.id;
+
+      if (!order) {
+        return res.status(400).json({ message: "Order data is required" });
+      }
+
+      // Update the order
+      const updatedOrder = await storage.updateOrder(orderId, {
+        ...order,
+        orderDate: new Date(order.orderDate),
+        expectedDate: order.expectedDate ? new Date(order.expectedDate) : null,
+      });
+
+      if (!updatedOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Delete existing line items and create new ones
+      if (lineItems) {
+        await storage.deleteOrderLineItemsByOrderId(orderId);
+
+        const createdLineItems = [];
+        for (const item of lineItems) {
+          if (!item.productId || item.productId.trim() === "") {
+            continue;
+          }
+
+          const lineItemValidation = insertOrderLineItemSchema.safeParse({
+            ...item,
+            orderId: orderId,
+          });
+
+          if (lineItemValidation.success) {
+            const lineItem = await storage.createOrderLineItem(
+              lineItemValidation.data,
+            );
+            createdLineItems.push(lineItem);
+          }
+        }
+
+        res.json({
+          ...updatedOrder,
+          lineItems: createdLineItems,
+        });
+      } else {
+        res.json(updatedOrder);
+      }
+    } catch (error) {
+      console.error("Error updating order:", error);
+      res.status(500).json({ message: "Failed to update order" });
+    }
+  });
+
+  // Update order status
+  app.patch("/api/orders/:id/status", isAuthenticated, async (req, res) => {
+    try {
+      const { status } = req.body;
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
+
+      const success = await storage.updateOrderStatus(req.params.id, status);
+      if (success) {
+        res.json({ message: "Order status updated successfully" });
+      } else {
+        res.status(404).json({ message: "Order not found" });
+      }
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      res.status(500).json({ message: "Failed to update order status" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

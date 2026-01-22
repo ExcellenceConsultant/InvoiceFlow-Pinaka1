@@ -8,6 +8,7 @@ import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Business from "@/pages/business";
+import Orders from "@/pages/orders";
 import InvoiceView from "@/pages/invoice-view";
 import PackingList from "@/pages/packing-list";
 import ShippingLabel from "@/pages/shipping-label";
@@ -64,6 +65,9 @@ function Router() {
         <Route path="/">{isAuthenticated ? <Dashboard /> : <Landing />}</Route>
         <Route path="/business">
           <ProtectedRoute component={Business} />
+        </Route>
+        <Route path="/orders">
+          <ProtectedRoute component={Orders} />
         </Route>
         <Route path="/invoices/:id">
           {(params) => <ProtectedRoute component={InvoiceView} {...params} />}
