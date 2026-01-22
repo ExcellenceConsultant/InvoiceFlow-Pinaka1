@@ -33,6 +33,7 @@ const orderSchema = z.object({
   purchaseOrder: z.string().optional().default(""),
   orderDate: z.string().min(1, "Order date is required"),
   orderType: z.enum(["sales", "purchase"]).default("purchase"),
+  status: z.enum(["draft", "approved", "finalized", "closed", "cancelled"]).default("draft"),
   freight: z.number().min(0, "Freight must be non-negative").default(0),
   discount: z.number().min(0, "Discount must be non-negative").default(0),
   notes: z.string().optional(),
@@ -74,6 +75,7 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
       purchaseOrder: "",
       orderDate: new Date().toISOString().split("T")[0],
       orderType: "purchase",
+      status: "draft",
       freight: 0,
       discount: 0,
       notes: "",
@@ -103,6 +105,7 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
           ? new Date(order.orderDate).toISOString().split("T")[0]
           : new Date().toISOString().split("T")[0],
         orderType: order.orderType || "purchase",
+        status: order.status || "draft",
         freight: parseFloat(order.freight || 0),
         discount: parseFloat(order.discount || 0),
         notes: order.notes || "",
@@ -284,7 +287,7 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
         discount: data.discount.toString(),
         subtotal: subtotal.toString(),
         total: total.toString(),
-        status: "draft",
+        status: data.status,
       },
       lineItems: validLineItems.map((item) => ({
         ...item,
@@ -386,23 +389,52 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="purchaseOrder"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Reference Number</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Internal reference (optional)"
-                        data-testid="input-reference"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="purchaseOrder"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Reference Number</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Internal reference (optional)"
+                          data-testid="input-reference"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-status">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="draft">Draft</SelectItem>
+                          <SelectItem value="approved">Approved</SelectItem>
+                          <SelectItem value="finalized">Finalized</SelectItem>
+                          <SelectItem value="closed">Closed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
