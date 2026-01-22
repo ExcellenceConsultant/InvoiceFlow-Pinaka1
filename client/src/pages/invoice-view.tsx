@@ -5,7 +5,7 @@ import { formatDateUS } from "@/lib/dateUtils";
 import { formatCurrency } from "@/lib/utils";
 import { Invoice, InvoiceLineItem } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Package, Printer, Tag } from "lucide-react";
+import { ArrowLeft, Printer, Tag } from "lucide-react";
 import { useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 function toNumber(v: any) {
