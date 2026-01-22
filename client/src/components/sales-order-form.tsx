@@ -291,11 +291,19 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
       order: {
         ...data,
         orderType: "sales",
+        freight: data.freight.toString(),
+        discount: data.discount.toString(),
         subtotal: subtotal.toString(),
         total: total.toString(),
         status: "draft",
       },
-      lineItems: validLineItems,
+      lineItems: validLineItems.map((item) => ({
+        ...item,
+        unitPrice: item.unitPrice.toString(),
+        lineTotal: item.lineTotal.toString(),
+        grossWeightKgs: item.grossWeightKgs?.toString() || "0",
+        netWeightKgs: item.netWeightKgs?.toString() || "0",
+      })),
     };
 
     if (isEditMode) {
