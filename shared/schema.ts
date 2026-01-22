@@ -239,6 +239,8 @@ export const orders = pgTable("orders", {
   orderDate: timestamp("order_date").notNull(),
   expectedDate: timestamp("expected_date"),
   notes: text("notes"),
+  isConverted: boolean("is_converted").default(false),
+  convertedDocumentId: varchar("converted_document_id"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

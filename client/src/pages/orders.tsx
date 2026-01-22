@@ -22,13 +22,18 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Check,
   Edit,
+  Eye,
   FileText,
   Plus,
+  Printer,
   Search,
+  Send,
   Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
 
 type SortKey =
   | "orderNumber"
@@ -47,11 +52,12 @@ type SortConfig = {
 const ORDER_STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-800",
   approved: "bg-blue-100 text-blue-800",
+  finalized: "bg-purple-100 text-purple-800",
   closed: "bg-green-100 text-green-800",
   cancelled: "bg-red-100 text-red-800",
 };
 
-const ORDER_STATUSES = ["draft", "approved", "closed", "cancelled"];
+const ORDER_STATUSES = ["draft", "approved", "finalized", "closed", "cancelled"];
 
 export default function Orders() {
   const permissions = usePermissions();
@@ -74,6 +80,8 @@ export default function Orders() {
     queryKey: ["/api/customers"],
   });
 
+  const [, setLocation] = useLocation();
+
   const deleteOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
       const response = await apiRequest("DELETE", `/api/orders/${orderId}`, {});
@@ -94,6 +102,34 @@ export default function Orders() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete order",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const convertOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await apiRequest("POST", `/api/orders/${orderId}/convert`, {});
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to convert order");
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      toast({
+        title: "Success",
+        description: data.message,
+      });
+      // Redirect to Business module with appropriate tab
+      setLocation("/business");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to convert order",
         variant: "destructive",
       });
     },
@@ -443,22 +479,76 @@ export default function Orders() {
                           </Badge>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex justify-end gap-2">
-                            {canEdit && (
+                          <div className="flex justify-end gap-1">
+                            {canEdit && !order.isConverted && (
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleEdit(order)}
+                                title="Edit"
                                 data-testid={`button-edit-${order.id}`}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                             )}
-                            {canDelete && (
+                            {order.orderType === "sales" && permissions.canViewPackingSlip && (order.status === "approved" || order.status === "finalized" || order.isConverted) && (
+                              <Link href={`/orders/${order.id}/packing-slip`}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="View Packing Slip"
+                                  data-testid={`button-packing-slip-${order.id}`}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            )}
+                            {(order.status === "approved" || order.status === "finalized") && !order.isConverted && (
+                              order.orderType === "sales" ? (
+                                permissions.canSendSalesOrderToInvoice && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => convertOrderMutation.mutate(order.id)}
+                                    disabled={convertOrderMutation.isPending}
+                                    title="Send to Invoice"
+                                    data-testid={`button-send-to-invoice-${order.id}`}
+                                  >
+                                    <Send className="h-4 w-4 text-blue-600" />
+                                  </Button>
+                                )
+                              ) : (
+                                permissions.canSendPurchaseOrderToBill && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => convertOrderMutation.mutate(order.id)}
+                                    disabled={convertOrderMutation.isPending}
+                                    title="Send to Bill"
+                                    data-testid={`button-send-to-bill-${order.id}`}
+                                  >
+                                    <Send className="h-4 w-4 text-green-600" />
+                                  </Button>
+                                )
+                              )
+                            )}
+                            {order.isConverted && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled
+                                title="Already Converted"
+                                data-testid={`button-converted-${order.id}`}
+                              >
+                                <Check className="h-4 w-4 text-green-600" />
+                              </Button>
+                            )}
+                            {canDelete && !order.isConverted && (
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleDelete(order.id)}
+                                title="Delete"
                                 data-testid={`button-delete-${order.id}`}
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />

@@ -624,14 +624,6 @@ function InvoiceView() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => setLocation(`/invoices/${id}/packing-list`)}
-            data-testid="button-packing-list"
-          >
-            <Package className="h-4 w-4 mr-2" />
-            View Packing List
-          </Button>
-          <Button
-            variant="outline"
             onClick={() => setLocation(`/invoices/${id}/shipping-label`)}
             data-testid="button-shipping-label"
           >

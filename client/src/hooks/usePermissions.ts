@@ -61,5 +61,10 @@ export function usePermissions() {
     canEditPurchaseOrder: role === "super_admin" || role === "admin",
     canDeletePurchaseOrder: role === "super_admin" || role === "admin",
     canViewPurchaseOrders: true,
+    
+    // Order Conversions
+    canSendSalesOrderToInvoice: role === "super_admin" || role === "admin",
+    canSendPurchaseOrderToBill: role === "super_admin" || role === "admin",
+    canViewPackingSlip: true,
   };
 }

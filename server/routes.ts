@@ -4975,6 +4975,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Convert order to invoice/bill
+  app.post("/api/orders/:id/convert", isAuthenticated, async (req, res) => {
+    try {
+      const orderId = req.params.id;
+      const user = (req as any).user;
+
+      // Get the order
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Check if already converted
+      if (order.isConverted) {
+        return res.status(400).json({ message: "Order has already been converted" });
+      }
+
+      // Check status - only finalized or approved orders can be converted
+      if (order.status !== "finalized" && order.status !== "approved") {
+        return res.status(400).json({ 
+          message: "Only finalized or approved orders can be converted" 
+        });
+      }
+
+      // Get order line items
+      const orderLineItems = await storage.getOrderLineItems(orderId);
+
+      // Determine invoice type based on order type
+      const invoiceType = order.orderType === "sales" ? "receivable" : "payable";
+
+      // Get next invoice number for AR invoices
+      let invoiceNumber = "";
+      if (invoiceType === "receivable") {
+        const invoices = await storage.getInvoices(user.userId);
+        const arInvoices = invoices.filter(inv => inv.invoiceType === "receivable");
+        if (arInvoices.length === 0) {
+          invoiceNumber = "1";
+        } else {
+          const numericInvoiceNumbers = arInvoices
+            .map(inv => {
+              const num = parseInt(inv.invoiceNumber.replace(/\D/g, ""), 10);
+              return isNaN(num) ? 0 : num;
+            });
+          const maxNumber = Math.max(...numericInvoiceNumbers, 0);
+          invoiceNumber = (maxNumber + 1).toString();
+        }
+      } else {
+        // For AP bills, use order number as reference
+        invoiceNumber = order.orderNumber;
+      }
+
+      // Create invoice/bill
+      const invoiceData = {
+        customerId: order.customerId,
+        invoiceNumber: invoiceNumber,
+        purchaseOrder: order.orderNumber, // Reference the order number
+        invoiceDate: new Date(),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        paymentTerms: 30,
+        invoiceType: invoiceType,
+        subtotal: order.subtotal,
+        freight: order.freight,
+        discount: order.discount,
+        total: order.total,
+        status: "draft",
+        notes: `Converted from Order ${order.orderNumber}`,
+        userId: user.userId,
+      };
+
+      const createdInvoice = await storage.createInvoice(invoiceData);
+
+      // Create invoice line items
+      for (const item of orderLineItems) {
+        await storage.createInvoiceLineItem({
+          invoiceId: createdInvoice.id,
+          productId: item.productId,
+          variantId: item.variantId || null,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          lineTotal: item.lineTotal,
+          productCode: item.productCode,
+          cartoonBarcode: item.cartoonBarcode,
+          packingSize: item.packingSize,
+          grossWeightKgs: item.grossWeightKgs,
+          netWeightKgs: item.netWeightKgs,
+          category: item.category,
+          isFreeFromScheme: item.isFreeFromScheme || false,
+          isSchemeDescription: item.isSchemeDescription || false,
+          schemeId: item.schemeId || null,
+        });
+      }
+
+      // Mark order as converted
+      await storage.updateOrder(orderId, {
+        isConverted: true,
+        convertedDocumentId: createdInvoice.id,
+      });
+
+      res.json({
+        message: `Order successfully converted to ${invoiceType === "receivable" ? "Invoice" : "Bill"}`,
+        invoiceId: createdInvoice.id,
+        invoiceType: invoiceType,
+      });
+    } catch (error) {
+      console.error("Error converting order:", error);
+      res.status(500).json({ message: "Failed to convert order" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -1,0 +1,130 @@
+Enhance the existing **Orders module** with the following features.
+
+Current state:
+- Orders module already exists
+- Tabs: Sales Orders (SO) and Purchase Orders (PO)
+- Shared listing table with status column and actions
+
+New Requirements:
+
+--------------------------------
+1. Send to Invoice / Bill Button
+--------------------------------
+
+Add a new action button in the Orders listing table:
+
+- Button label:
+  - Sales Order → “Send to Invoice”
+  - Purchase Order → “Send to Bill”
+
+Button visibility rules:
+- Show ONLY when:
+  - Order status === "finalized" OR "approved"
+- Hide for:
+  - draft / cancelled orders
+
+Button behavior:
+- On click:
+  - Create a NEW record in **Business module**
+    - Sales Order → Invoice (AR)
+    - Purchase Order → Bill (AP)
+  - Copy data:
+    - Customer / Vendor
+    - Line items
+    - Quantity
+    - Cartons
+    - Amount
+    - Taxes
+    - Reference orderNumber
+  - Redirect user to:
+    - Business → Invoices tab (for SO)
+    - Business → Bills tab (for PO)
+  - Show success toast:
+    “Order successfully sent to Invoice/Bill”
+
+After sending:
+- Mark order with:
+  - isConverted = true
+  - convertedDocumentId
+- Disable Send button once converted
+
+--------------------------------
+2. Packing Slip (MOVE TO ORDERS)
+--------------------------------
+
+Packing Slip should exist ONLY in Orders module.
+
+Add actions in Orders:
+- “View Packing Slip”
+- “Print Packing Slip”
+
+Packing Slip rules:
+- Available for Sales Orders only
+- Can be viewed for:
+  - finalized / approved / converted orders
+
+Packing Slip content:
+- Company header
+- Order Number
+- Order Date
+- Customer name & address
+- Product name
+- Quantity
+- Cartons
+- Notes (optional)
+- NO pricing
+- NO tax
+- NO totals
+
+Implementation:
+- Create `PackingSlipView` component
+- Printable layout (A4)
+- Use window.print() or existing print utility
+
+--------------------------------
+3. REMOVE Packing Slip from Business Module
+--------------------------------
+
+- Remove:
+  - Packing Slip buttons
+  - Packing Slip routes
+  - Packing Slip logic
+- Business module should ONLY handle:
+  - Invoice
+  - Bill
+  - PDF Invoice print
+
+--------------------------------
+4. UI / Actions Column
+--------------------------------
+
+Orders table Actions column should include:
+- Edit
+- Delete
+- View Packing Slip (SO only)
+- Print Packing Slip (SO only)
+- Send to Invoice / Send to Bill
+
+Buttons should be icon-based and clean.
+
+--------------------------------
+5. Code Quality
+--------------------------------
+
+- Do NOT duplicate logic
+- Reuse existing helpers where possible
+- Keep Orders and Business modules clearly separated
+- Follow existing permission checks
+
+Permissions:
+- canSendSalesOrderToInvoice
+- canSendPurchaseOrderToBill
+- canViewPackingSlip
+
+--------------------------------
+Deliverables:
+--------------------------------
+- Updated Orders table actions
+- Order → Invoice/Bill conversion logic
+- PackingSlipView component (Orders module)
+- Removed Packing Slip from Business module
