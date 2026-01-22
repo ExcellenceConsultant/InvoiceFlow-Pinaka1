@@ -299,6 +299,7 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
       },
       lineItems: validLineItems.map((item) => ({
         ...item,
+        variantId: item.variantId || null,
         unitPrice: item.unitPrice.toString(),
         lineTotal: item.lineTotal.toString(),
         grossWeightKgs: item.grossWeightKgs?.toString() || "0",
