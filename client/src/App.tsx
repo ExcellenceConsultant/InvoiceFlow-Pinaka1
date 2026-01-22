@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
-import Invoices from "@/pages/invoices";
+import Business from "@/pages/business";
 import InvoiceView from "@/pages/invoice-view";
 import PackingList from "@/pages/packing-list";
 import ShippingLabel from "@/pages/shipping-label";
@@ -62,8 +62,8 @@ function Router() {
           {isAuthenticated ? <Dashboard /> : <Login />}
         </Route>
         <Route path="/">{isAuthenticated ? <Dashboard /> : <Landing />}</Route>
-        <Route path="/invoices">
-          <ProtectedRoute component={Invoices} />
+        <Route path="/business">
+          <ProtectedRoute component={Business} />
         </Route>
         <Route path="/invoices/:id">
           {(params) => <ProtectedRoute component={InvoiceView} {...params} />}

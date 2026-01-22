@@ -26,13 +26,19 @@ export function usePermissions() {
     canManageSchemes: role === "super_admin" || role === "admin",
     canViewSchemes: true,
     
-    // Invoices
+    // Invoices (AR)
     canCreateInvoice: role === "super_admin" || role === "admin",
     canEditInvoice: role === "super_admin" || role === "admin",
     canDeleteInvoice: role === "super_admin" || role === "admin",
     canPostToQuickBooks: role === "super_admin" || role === "admin" || role === "poster",
     canViewInvoices: true,
     canPrintInvoices: true, // All can print
+    
+    // Bills (AP)
+    canCreateBill: role === "super_admin" || role === "admin",
+    canEditBill: role === "super_admin" || role === "admin",
+    canDeleteBill: role === "super_admin" || role === "admin",
+    canViewBills: true,
     
     // Dashboard
     canViewDashboard: true,

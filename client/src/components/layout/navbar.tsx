@@ -37,13 +37,13 @@ export default function Navbar() {
                   Dashboard
                 </Button>
               </Link>
-              <Link href="/invoices">
+              <Link href="/business">
                 <Button
-                  variant={location === "/invoices" ? "default" : "ghost"}
+                  variant={location === "/business" ? "default" : "ghost"}
                   size="sm"
-                  data-testid="link-invoices"
+                  data-testid="link-business"
                 >
-                  Invoices
+                  Business
                 </Button>
               </Link>
               <Link href="/credit-memos">

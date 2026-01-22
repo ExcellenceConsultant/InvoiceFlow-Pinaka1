@@ -1,4 +1,5 @@
 import InvoiceForm from "@/components/invoice-form";
+import BillForm from "@/components/bill-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -311,7 +312,7 @@ const getDueStatusMessage = (invoice: any, statusOverride?: string) => {
   return `Overdue by ${formatDayCount(overdueDays)}`;
 };
 
-export default function Invoices() {
+export default function Business() {
   const permissions = usePermissions();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1003,10 +1004,10 @@ export default function Invoices() {
               className="text-3xl font-bold text-foreground"
               data-testid="page-title"
             >
-              Invoices
+              Business
             </h1>
             <p className="text-muted-foreground mt-1">
-              Manage and track all your invoices
+              Manage invoices and bills
             </p>
           </div>
 
@@ -1051,11 +1052,11 @@ export default function Invoices() {
             </Button>
             <Button
               onClick={() => setShowInvoiceForm(true)}
-              disabled={!permissions.canCreateInvoice}
-              data-testid="button-create-invoice"
+              disabled={activeTab === "AR" ? !permissions.canCreateInvoice : !permissions.canCreateBill}
+              data-testid={activeTab === "AR" ? "button-create-invoice" : "button-create-bill"}
             >
               <Plus className="mr-2" size={16} />
-              Create Invoice
+              {activeTab === "AR" ? "Create Invoice" : "Create Bill"}
             </Button>
           </div>
         </div>
@@ -1162,10 +1163,10 @@ export default function Invoices() {
               </CardTitle>
               <TabsList data-testid="tabs-list">
                 <TabsTrigger value="AR" data-testid="tab-ar-invoices">
-                  AR Invoices
+                  Invoices
                 </TabsTrigger>
                 <TabsTrigger value="AP" data-testid="tab-ap-bills">
-                  AP Bills
+                  Bills
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -1520,16 +1521,16 @@ export default function Invoices() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   {searchTerm || statusFilter !== "all"
                     ? "Try adjusting your search or filter criteria."
-                    : "Create your first invoice to get started."}
+                    : activeTab === "AR" ? "Create your first invoice to get started." : "Create your first bill to get started."}
                 </p>
                 <Button
                   className="mt-4"
                   onClick={() => setShowInvoiceForm(true)}
-                  disabled={!permissions.canCreateInvoice}
-                  data-testid="button-create-first-invoice"
+                  disabled={activeTab === "AR" ? !permissions.canCreateInvoice : !permissions.canCreateBill}
+                  data-testid={activeTab === "AR" ? "button-create-first-invoice" : "button-create-first-bill"}
                 >
                   <Plus className="mr-2" size={16} />
-                  Create Invoice
+                  {activeTab === "AR" ? "Create Invoice" : "Create Bill"}
                 </Button>
               </div>
             )}
@@ -1537,13 +1538,21 @@ export default function Invoices() {
         </Card>
       </Tabs>
 
-      {/* Invoice Form Modal */}
+      {/* Invoice/Bill Form Modal */}
       {showInvoiceForm && (
-        <InvoiceForm
-          invoice={editingInvoice}
-          onClose={handleCloseInvoiceForm}
-          onSuccess={handleCloseInvoiceForm}
-        />
+        editingInvoice?.invoiceType === "payable" || (!editingInvoice && activeTab === "AP") ? (
+          <BillForm
+            bill={editingInvoice}
+            onClose={handleCloseInvoiceForm}
+            onSuccess={handleCloseInvoiceForm}
+          />
+        ) : (
+          <InvoiceForm
+            invoice={editingInvoice}
+            onClose={handleCloseInvoiceForm}
+            onSuccess={handleCloseInvoiceForm}
+          />
+        )
       )}
 
       <Dialog
