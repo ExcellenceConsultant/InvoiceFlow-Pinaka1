@@ -867,12 +867,15 @@ function ProductTaxCodesTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {productTaxCodes.map((ptc) => (
+              {productTaxCodes.map((ptc) => {
+                const product = products.find(p => p.id === ptc.productId);
+                const taxCode = taxCodes.find(tc => tc.id === ptc.taxCodeId);
+                return (
                 <TableRow key={ptc.id} data-testid={`row-product-tax-${ptc.id}`}>
-                  <TableCell className="font-medium">{ptc.product?.name || "-"}</TableCell>
-                  <TableCell>{ptc.product?.itemCode || "-"}</TableCell>
+                  <TableCell className="font-medium">{product?.name || "-"}</TableCell>
+                  <TableCell>{product?.itemCode || "-"}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">{ptc.taxCode?.code || "-"}</Badge>
+                    <Badge variant="outline">{taxCode?.code || "-"}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(ptc.id)} data-testid={`button-delete-product-tax-${ptc.id}`}>
@@ -880,7 +883,8 @@ function ProductTaxCodesTab() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}
