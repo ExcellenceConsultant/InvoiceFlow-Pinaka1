@@ -1150,12 +1150,12 @@ function CustomerTaxSettingsTab() {
             {!formData.isTaxExempt && (
               <div className="space-y-2">
                 <Label>Override Tax Code (optional)</Label>
-                <Select value={formData.overrideTaxCodeId} onValueChange={(v) => setFormData({ ...formData, overrideTaxCodeId: v })}>
+                <Select value={formData.overrideTaxCodeId || "none"} onValueChange={(v) => setFormData({ ...formData, overrideTaxCodeId: v === "none" ? "" : v })}>
                   <SelectTrigger data-testid="select-override-tax-code">
                     <SelectValue placeholder="Use default tax logic" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Use default tax logic</SelectItem>
+                    <SelectItem value="none">Use default tax logic</SelectItem>
                     {taxCodes.filter(tc => tc.status === "active").map((code) => (
                       <SelectItem key={code.id} value={code.id}>
                         {code.code} - {code.name}
