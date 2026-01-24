@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Bell, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import pinakaLogo from "@/assets/pinaka-logo.jpg";
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -19,9 +20,10 @@ export default function Navbar() {
           <div className="flex items-center">
             <Link
               href="/"
-              className="flex items-center mr-8 flex-shrink-0"
+              className="flex items-center mr-8 flex-shrink-0 gap-2"
               data-testid="link-home"
             >
+              <img src={pinakaLogo} alt="Pinaka Foods Inc" className="h-8 w-8 object-contain" />
               <span className="text-xl font-bold text-foreground whitespace-nowrap">
                 InvoiceFlow
               </span>
