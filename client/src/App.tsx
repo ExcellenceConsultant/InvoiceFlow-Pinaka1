@@ -22,8 +22,6 @@ import QuickBooksAuth from "@/pages/quickbooks-auth";
 import QuickBooksCallback from "@/pages/quickbooks-callback";
 import QuickBooksSync from "@/pages/quickbooks-sync";
 import UserManagement from "@/pages/user-management";
-import Profitability from "@/pages/profitability";
-import ProfitInvoiceView from "@/pages/profit-invoice-view";
 import Navbar from "@/components/layout/navbar";
 import NotFound from "@/pages/not-found";
 
@@ -111,12 +109,6 @@ function Router() {
         </Route>
         <Route path="/users">
           <ProtectedRoute component={UserManagement} />
-        </Route>
-        <Route path="/profitability">
-          <ProtectedRoute component={Profitability} />
-        </Route>
-        <Route path="/profitability/invoices/:id">
-          {(params) => <ProtectedRoute component={ProfitInvoiceView} {...params} />}
         </Route>
         <Route component={NotFound} />
       </Switch>

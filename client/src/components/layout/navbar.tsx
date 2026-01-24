@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { Bell, LogOut, TrendingUp } from "lucide-react";
+import { Bell, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 export default function Navbar() {
@@ -111,18 +111,6 @@ export default function Navbar() {
                   Users
                 </Button>
               </Link>
-              {user?.role === "super_admin" && (
-                <Link href="/profitability">
-                  <Button
-                    variant={location === "/profitability" ? "default" : "ghost"}
-                    size="sm"
-                    data-testid="link-profitability"
-                  >
-                    <TrendingUp className="h-4 w-4 mr-1" />
-                    Profit
-                  </Button>
-                </Link>
-              )}
             </div>
           </div>
 
