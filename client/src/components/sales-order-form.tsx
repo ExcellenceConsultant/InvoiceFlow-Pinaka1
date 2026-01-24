@@ -47,22 +47,21 @@ interface Props {
 
 export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
   const isEditMode = !!order;
-  const [lineItems, setLineItems] = useState([
-    {
-      productId: "",
-      variantId: "",
-      description: "",
-      quantity: 1,
-      unitPrice: 0,
-      lineTotal: 0,
-      productCode: "",
-      cartoonBarcode: "",
-      packingSize: "",
-      grossWeightKgs: 0,
-      netWeightKgs: 0,
-      category: "",
-    },
-  ]);
+  const [lineItems, setLineItems] = useState<Array<{
+    productId: string;
+    variantId: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    productCode: string;
+    cartoonBarcode: string;
+    packingSize: string;
+    grossWeightKgs: number;
+    netWeightKgs: number;
+    category: string;
+  }>>([]);
+  const [lineItemsLoaded, setLineItemsLoaded] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -122,7 +121,7 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
         notes: order.notes || "",
       });
 
-      // Load line items
+      // Load line items from API
       if (order.id) {
         fetch(`/api/orders/${order.id}/line-items`)
           .then((res) => res.json())
@@ -145,10 +144,33 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                 }))
               );
             }
+            setLineItemsLoaded(true);
+          })
+          .catch(() => {
+            setLineItemsLoaded(true);
           });
       }
+    } else if (!isEditMode) {
+      // For new orders, initialize with one empty line item
+      setLineItems([createEmptyLineItem()]);
+      setLineItemsLoaded(true);
     }
   }, [order, isEditMode, form]);
+
+  const createEmptyLineItem = () => ({
+    productId: "",
+    variantId: "",
+    description: "",
+    quantity: 1,
+    unitPrice: 0,
+    lineTotal: 0,
+    productCode: "",
+    cartoonBarcode: "",
+    packingSize: "",
+    grossWeightKgs: 0,
+    netWeightKgs: 0,
+    category: "",
+  });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -246,28 +268,16 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
   };
 
   const addLineItem = () => {
-    setLineItems([
-      ...lineItems,
-      {
-        productId: "",
-        variantId: "",
-        description: "",
-        quantity: 1,
-        unitPrice: 0,
-        lineTotal: 0,
-        productCode: "",
-        cartoonBarcode: "",
-        packingSize: "",
-        grossWeightKgs: 0,
-        netWeightKgs: 0,
-        category: "",
-      },
-    ]);
+    setLineItems([...lineItems, createEmptyLineItem()]);
   };
 
   const removeLineItem = (index: number) => {
-    if (lineItems.length > 1) {
-      setLineItems(lineItems.filter((_, i) => i !== index));
+    const newLineItems = lineItems.filter((_, i) => i !== index);
+    // Keep at least one empty line item if removing the last one
+    if (newLineItems.length === 0) {
+      setLineItems([createEmptyLineItem()]);
+    } else {
+      setLineItems(newLineItems);
     }
   };
 
@@ -461,13 +471,22 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                   </Button>
                 </div>
 
+                {/* Table Header */}
+                <div className="grid grid-cols-12 gap-2 mb-2 text-sm font-medium text-muted-foreground border-b pb-2">
+                  <div className="col-span-5">Product</div>
+                  <div className="col-span-2">Qty</div>
+                  <div className="col-span-2">Rate</div>
+                  <div className="col-span-2 text-right">Amount</div>
+                  <div className="col-span-1"></div>
+                </div>
+
                 <div className="space-y-2">
                   {lineItems.map((item, index) => (
                     <div
                       key={index}
-                      className="grid grid-cols-12 gap-2 items-end"
+                      className="grid grid-cols-12 gap-2 items-center"
                     >
-                      <div className="col-span-4">
+                      <div className="col-span-5">
                         <Select
                           value={item.productId}
                           onValueChange={(value) =>
@@ -497,7 +516,6 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                               parseInt(e.target.value) || 1
                             )
                           }
-                          placeholder="Qty"
                           data-testid={`input-quantity-${index}`}
                         />
                       </div>
@@ -513,20 +531,18 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                               parseFloat(e.target.value) || 0
                             )
                           }
-                          placeholder="Price"
                           data-testid={`input-price-${index}`}
                         />
                       </div>
-                      <div className="col-span-3 text-right font-medium">
+                      <div className="col-span-2 text-right font-medium">
                         {formatCurrency(item.lineTotal)}
                       </div>
-                      <div className="col-span-1">
+                      <div className="col-span-1 flex justify-end">
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
                           onClick={() => removeLineItem(index)}
-                          disabled={lineItems.length === 1}
                           data-testid={`button-remove-item-${index}`}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
