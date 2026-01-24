@@ -524,12 +524,11 @@ export const taxRates = pgTable("tax_rates", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   qbTaxRateId: text("qb_tax_rate_id"), // QuickBooks TaxRate ID for sync
-  taxName: text("tax_name").notNull(),
-  taxPercentage: decimal("tax_percentage", { precision: 6, scale: 4 }).notNull(), // e.g., 8.2500%
-  jurisdiction: text("jurisdiction"), // State/jurisdiction name
+  name: text("name").notNull(), // Tax rate display name
+  rate: decimal("rate", { precision: 6, scale: 4 }).notNull(), // e.g., 8.2500%
   taxAgencyId: varchar("tax_agency_id").references(() => taxAgencies.id),
-  effectiveFromDate: timestamp("effective_from_date").notNull(),
-  effectiveToDate: timestamp("effective_to_date"), // null = currently active
+  effectiveFrom: text("effective_from"), // ISO date string for effective start
+  effectiveTo: text("effective_to"), // null = currently active
   status: text("status").notNull().default("active"), // active, inactive
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),

@@ -148,8 +148,8 @@ async function getActiveTaxRatesForCode(
     const rate = tcr.taxRate;
     
     // Check if rate is active on the invoice date
-    const effectiveFrom = new Date(rate.effectiveFromDate);
-    const effectiveTo = rate.effectiveToDate ? new Date(rate.effectiveToDate) : null;
+    const effectiveFrom = rate.effectiveFrom ? new Date(rate.effectiveFrom) : new Date(0);
+    const effectiveTo = rate.effectiveTo ? new Date(rate.effectiveTo) : null;
     
     if (invoiceDate >= effectiveFrom && (!effectiveTo || invoiceDate <= effectiveTo)) {
       if (rate.status === "active") {
@@ -213,7 +213,7 @@ export async function getQuickBooksSalesTax(
   const appliedTaxRates: TaxCalculationResult["appliedTaxRates"] = [];
   
   for (const rate of activeRates) {
-    const percentage = parseFloat(rate.taxPercentage);
+    const percentage = parseFloat(rate.rate);
     const taxAmount = qbRound((taxableAmount * percentage) / 100, 2);
     
     totalTaxPercentage += percentage;
@@ -221,7 +221,7 @@ export async function getQuickBooksSalesTax(
     
     appliedTaxRates.push({
       taxRateId: rate.id,
-      taxName: rate.taxName,
+      taxName: rate.name,
       percentage: percentage.toFixed(4),
       amount: taxAmount.toFixed(2),
       taxAgencyId: rate.taxAgencyId || undefined,

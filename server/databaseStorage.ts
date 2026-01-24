@@ -1131,18 +1131,21 @@ export class DatabaseStorage implements IStorage {
 
   async getActiveTaxRatesForDate(date: Date, userId: string): Promise<TaxRate[]> {
     await this.ensureInitialized();
-    // QB Alignment: Get tax rates active on the given date (effectiveFromDate <= date AND (effectiveToDate is null OR effectiveToDate >= date))
-    return await db.select().from(taxRates).where(
+    // QB Alignment: Get tax rates active on the given date and status is active
+    // Date filtering is done in application code since effectiveFrom/To are text fields
+    const allRates = await db.select().from(taxRates).where(
       and(
         eq(taxRates.userId, userId),
-        eq(taxRates.status, "active"),
-        lte(taxRates.effectiveFromDate, date),
-        or(
-          isNull(taxRates.effectiveToDate),
-          gte(taxRates.effectiveToDate, date)
-        )
+        eq(taxRates.status, "active")
       )
     );
+    
+    // Filter by effective date range in application code
+    return allRates.filter(rate => {
+      const effectiveFrom = rate.effectiveFrom ? new Date(rate.effectiveFrom) : new Date(0);
+      const effectiveTo = rate.effectiveTo ? new Date(rate.effectiveTo) : null;
+      return date >= effectiveFrom && (!effectiveTo || date <= effectiveTo);
+    });
   }
 
   async createTaxRate(rateData: InsertTaxRate & { userId: string }): Promise<TaxRate> {
