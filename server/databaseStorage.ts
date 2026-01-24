@@ -2,6 +2,7 @@ import {
   creditMemoLineItems,
   creditMemos,
   customers,
+  customerProductMargins,
   invoiceLineItems,
   invoices,
   orders,
@@ -14,9 +15,11 @@ import {
   type CreditMemo,
   type CreditMemoLineItem,
   type Customer,
+  type CustomerProductMargin,
   type InsertCreditMemo,
   type InsertCreditMemoLineItem,
   type InsertCustomer,
+  type InsertCustomerProductMargin,
   type InsertInvoice,
   type InsertInvoiceLineItem,
   type InsertOrder,
@@ -750,6 +753,65 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(orderLineItems)
       .where(eq(orderLineItems.orderId, orderId));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Customer Product Margins (for Advanced Price Rules)
+  async getCustomerProductMargins(): Promise<CustomerProductMargin[]> {
+    await this.ensureInitialized();
+    return db.select().from(customerProductMargins);
+  }
+
+  async getCustomerProductMarginsByCustomer(customerId: string): Promise<CustomerProductMargin[]> {
+    await this.ensureInitialized();
+    return db
+      .select()
+      .from(customerProductMargins)
+      .where(eq(customerProductMargins.customerId, customerId));
+  }
+
+  async getCustomerProductMargin(customerId: string, productId: string): Promise<CustomerProductMargin | undefined> {
+    await this.ensureInitialized();
+    const [margin] = await db
+      .select()
+      .from(customerProductMargins)
+      .where(
+        and(
+          eq(customerProductMargins.customerId, customerId),
+          eq(customerProductMargins.productId, productId)
+        )
+      )
+      .limit(1);
+    return margin;
+  }
+
+  async createCustomerProductMargin(marginData: InsertCustomerProductMargin): Promise<CustomerProductMargin> {
+    await this.ensureInitialized();
+    const [margin] = await db
+      .insert(customerProductMargins)
+      .values(marginData)
+      .returning();
+    return margin;
+  }
+
+  async updateCustomerProductMargin(id: string, marginPercent: number): Promise<CustomerProductMargin | undefined> {
+    await this.ensureInitialized();
+    const [margin] = await db
+      .update(customerProductMargins)
+      .set({ 
+        marginPercent: marginPercent.toString(),
+        updatedAt: new Date() 
+      })
+      .where(eq(customerProductMargins.id, id))
+      .returning();
+    return margin;
+  }
+
+  async deleteCustomerProductMargin(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db
+      .delete(customerProductMargins)
+      .where(eq(customerProductMargins.id, id));
     return (result.rowCount || 0) > 0;
   }
 }

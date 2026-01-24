@@ -2,6 +2,7 @@ import {
   insertCreditMemoLineItemSchema,
   insertCreditMemoSchema,
   insertCustomerSchema,
+  insertCustomerProductMarginSchema,
   insertInvoiceLineItemSchema,
   insertInvoiceSchema,
   insertOrderLineItemSchema,
@@ -10,6 +11,12 @@ import {
   insertProductSchemeSchema,
   insertProductVariantSchema,
 } from "@shared/schema";
+import { 
+  getSalesPrice, 
+  getBatchSalesPrices, 
+  getGlobalDefaultMargin, 
+  setGlobalDefaultMargin 
+} from "./pricing-service";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
@@ -5082,6 +5089,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error converting order:", error);
       res.status(500).json({ message: "Failed to convert order" });
+    }
+  });
+
+  // ============================================
+  // ADVANCED PRICE RULE API ENDPOINTS
+  // ============================================
+
+  // Get calculated sales price for a product-customer-date combination
+  // Used by Sales Order and Sales Invoice forms to auto-populate prices
+  app.post("/api/pricing/calculate", isAuthenticated, async (req, res) => {
+    try {
+      const { productId, customerId, documentDate } = req.body;
+
+      if (!productId || !customerId || !documentDate) {
+        return res.status(400).json({ 
+          message: "productId, customerId, and documentDate are required" 
+        });
+      }
+
+      const date = new Date(documentDate);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({ message: "Invalid documentDate format" });
+      }
+
+      const result = await getSalesPrice(productId, customerId, date);
+      res.json(result);
+    } catch (error) {
+      console.error("Error calculating price:", error);
+      res.status(500).json({ message: "Failed to calculate price" });
+    }
+  });
+
+  // Batch calculate prices for multiple products
+  app.post("/api/pricing/calculate-batch", isAuthenticated, async (req, res) => {
+    try {
+      const { productIds, customerId, documentDate } = req.body;
+
+      if (!productIds || !Array.isArray(productIds) || !customerId || !documentDate) {
+        return res.status(400).json({ 
+          message: "productIds (array), customerId, and documentDate are required" 
+        });
+      }
+
+      const date = new Date(documentDate);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({ message: "Invalid documentDate format" });
+      }
+
+      const results = await getBatchSalesPrices(productIds, customerId, date);
+      
+      // Convert Map to object for JSON serialization
+      const response: Record<string, any> = {};
+      results.forEach((value, key) => {
+        response[key] = value;
+      });
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error batch calculating prices:", error);
+      res.status(500).json({ message: "Failed to calculate prices" });
+    }
+  });
+
+  // Get global default margin
+  app.get("/api/pricing/global-margin", isAuthenticated, async (req, res) => {
+    try {
+      const margin = await getGlobalDefaultMargin();
+      res.json({ marginPercent: margin });
+    } catch (error) {
+      console.error("Error getting global margin:", error);
+      res.status(500).json({ message: "Failed to get global margin" });
+    }
+  });
+
+  // Set global default margin
+  app.post("/api/pricing/global-margin", isAuthenticated, async (req, res) => {
+    try {
+      const { marginPercent } = req.body;
+
+      if (typeof marginPercent !== "number" || marginPercent < 0 || marginPercent > 1000) {
+        return res.status(400).json({ 
+          message: "marginPercent must be a number between 0 and 1000" 
+        });
+      }
+
+      await setGlobalDefaultMargin(marginPercent);
+      res.json({ message: "Global margin updated successfully", marginPercent });
+    } catch (error) {
+      console.error("Error setting global margin:", error);
+      res.status(500).json({ message: "Failed to set global margin" });
+    }
+  });
+
+  // Customer-Product Margin CRUD
+  app.get("/api/pricing/customer-product-margins", isAuthenticated, async (req, res) => {
+    try {
+      const margins = await storage.getCustomerProductMargins();
+      res.json(margins);
+    } catch (error) {
+      console.error("Error getting customer-product margins:", error);
+      res.status(500).json({ message: "Failed to get margins" });
+    }
+  });
+
+  app.get("/api/pricing/customer-product-margins/:customerId", isAuthenticated, async (req, res) => {
+    try {
+      const margins = await storage.getCustomerProductMarginsByCustomer(req.params.customerId);
+      res.json(margins);
+    } catch (error) {
+      console.error("Error getting customer margins:", error);
+      res.status(500).json({ message: "Failed to get margins" });
+    }
+  });
+
+  app.post("/api/pricing/customer-product-margins", isAuthenticated, async (req, res) => {
+    try {
+      const parsed = insertCustomerProductMarginSchema.parse(req.body);
+      const margin = await storage.createCustomerProductMargin(parsed);
+      res.json(margin);
+    } catch (error) {
+      console.error("Error creating customer-product margin:", error);
+      res.status(500).json({ message: "Failed to create margin" });
+    }
+  });
+
+  app.put("/api/pricing/customer-product-margins/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { marginPercent } = req.body;
+      if (typeof marginPercent !== "number") {
+        return res.status(400).json({ message: "marginPercent is required" });
+      }
+
+      const margin = await storage.updateCustomerProductMargin(req.params.id, marginPercent);
+      res.json(margin);
+    } catch (error) {
+      console.error("Error updating customer-product margin:", error);
+      res.status(500).json({ message: "Failed to update margin" });
+    }
+  });
+
+  app.delete("/api/pricing/customer-product-margins/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteCustomerProductMargin(req.params.id);
+      res.json({ message: "Margin deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting customer-product margin:", error);
+      res.status(500).json({ message: "Failed to delete margin" });
     }
   });
 

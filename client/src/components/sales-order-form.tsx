@@ -244,24 +244,59 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
     },
   });
 
-  const handleProductChange = (index: number, productId: string) => {
+  const handleProductChange = async (index: number, productId: string) => {
     const product = products?.find((p: any) => p.id === productId);
     if (product) {
+      const customerId = form.getValues("customerId");
+      const orderDate = form.getValues("orderDate");
+      const orderType = form.getValues("orderType");
+      
+      // Default to product's static price
+      let unitPrice = parseFloat(product.salesPrice || product.basePrice || 0);
+      
+      // Only apply Advanced Price Rule for SALES orders (not purchase orders)
+      // This implements the Advanced Price Rule feature:
+      // sales_price = latest_purchase_price × (1 + margin_percentage / 100)
+      if (orderType === "sales" && customerId && orderDate) {
+        try {
+          const token = localStorage.getItem("token");
+          const response = await fetch("/api/pricing/calculate", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              productId,
+              customerId,
+              documentDate: orderDate,
+            }),
+          });
+          
+          if (response.ok) {
+            const priceResult = await response.json();
+            // Use calculated sales price from pricing API
+            unitPrice = priceResult.salesPrice;
+          }
+        } catch (error) {
+          console.error("Error fetching calculated price:", error);
+          // Fall back to product's static price on error
+        }
+      }
+      
       const newLineItems = [...lineItems];
       newLineItems[index] = {
         ...newLineItems[index],
         productId,
         description: product.name,
-        unitPrice: parseFloat(product.salesPrice || product.basePrice || 0),
+        unitPrice,
         productCode: product.itemCode || "",
         cartoonBarcode: product.cartoonBarcode || "",
         packingSize: product.packingSize || "",
         grossWeightKgs: parseFloat(product.grossWeight || 0),
         netWeightKgs: parseFloat(product.netWeight || 0),
         category: product.category || "",
-        lineTotal:
-          newLineItems[index].quantity *
-          parseFloat(product.salesPrice || product.basePrice || 0),
+        lineTotal: newLineItems[index].quantity * unitPrice,
       };
       setLineItems(newLineItems);
     }

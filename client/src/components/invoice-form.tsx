@@ -1216,7 +1216,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                             </label>
                             <Select
                               value={item.productId}
-                              onValueChange={(value) => {
+                              onValueChange={async (value) => {
                                 console.log("Product selected:", value);
                                 const product = products?.find(
                                   (p: any) => p.id === value,
@@ -1228,10 +1228,46 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                                   // Use salesPrice for AR (receivable) invoices, basePrice for AP (payable) invoices
                                   const invoiceType =
                                     form.getValues("invoiceType");
-                                  const unitPrice =
+                                  let unitPrice =
                                     invoiceType === "receivable"
                                       ? parseFloat(product.salesPrice) || 0
                                       : parseFloat(product.basePrice) || 0;
+                                  
+                                  // For AR (receivable) invoices, fetch calculated price from pricing API
+                                  // This implements the Advanced Price Rule feature:
+                                  // sales_price = latest_purchase_price × (1 + margin_percentage / 100)
+                                  if (invoiceType === "receivable") {
+                                    const customerId = form.getValues("customerId");
+                                    const invoiceDate = form.getValues("invoiceDate");
+                                    
+                                    if (customerId && invoiceDate) {
+                                      try {
+                                        const token = localStorage.getItem("token");
+                                        const response = await fetch("/api/pricing/calculate", {
+                                          method: "POST",
+                                          headers: {
+                                            "Content-Type": "application/json",
+                                            Authorization: `Bearer ${token}`,
+                                          },
+                                          body: JSON.stringify({
+                                            productId: value,
+                                            customerId,
+                                            documentDate: invoiceDate,
+                                          }),
+                                        });
+                                        
+                                        if (response.ok) {
+                                          const priceResult = await response.json();
+                                          // Use calculated sales price from pricing API
+                                          unitPrice = priceResult.salesPrice;
+                                        }
+                                      } catch (error) {
+                                        console.error("Error fetching calculated price:", error);
+                                        // Fall back to product's static price on error
+                                      }
+                                    }
+                                  }
+                                  
                                   updatedItems[index] = {
                                     ...updatedItems[index],
                                     productId: value,

@@ -21,6 +21,8 @@ import {
   type InsertOrder,
   type OrderLineItem,
   type InsertOrderLineItem,
+  type CustomerProductMargin,
+  type InsertCustomerProductMargin,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -141,6 +143,14 @@ export interface IStorage {
   createOrderLineItem(lineItem: InsertOrderLineItem): Promise<OrderLineItem>;
   deleteOrderLineItem(id: string): Promise<boolean>;
   deleteOrderLineItemsByOrderId(orderId: string): Promise<boolean>;
+
+  // Customer Product Margins (for Advanced Price Rules)
+  getCustomerProductMargins(): Promise<CustomerProductMargin[]>;
+  getCustomerProductMarginsByCustomer(customerId: string): Promise<CustomerProductMargin[]>;
+  getCustomerProductMargin(customerId: string, productId: string): Promise<CustomerProductMargin | undefined>;
+  createCustomerProductMargin(margin: InsertCustomerProductMargin): Promise<CustomerProductMargin>;
+  updateCustomerProductMargin(id: string, marginPercent: number): Promise<CustomerProductMargin | undefined>;
+  deleteCustomerProductMargin(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -806,6 +816,31 @@ export class MemStorage implements IStorage {
       .map(([id]) => id);
     itemsToDelete.forEach((id) => this.orderLineItems.delete(id));
     return true;
+  }
+
+  // Customer Product Margins (stub implementations for MemStorage)
+  async getCustomerProductMargins(): Promise<CustomerProductMargin[]> {
+    return [];
+  }
+
+  async getCustomerProductMarginsByCustomer(_customerId: string): Promise<CustomerProductMargin[]> {
+    return [];
+  }
+
+  async getCustomerProductMargin(_customerId: string, _productId: string): Promise<CustomerProductMargin | undefined> {
+    return undefined;
+  }
+
+  async createCustomerProductMargin(_margin: InsertCustomerProductMargin): Promise<CustomerProductMargin> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async updateCustomerProductMargin(_id: string, _marginPercent: number): Promise<CustomerProductMargin | undefined> {
+    return undefined;
+  }
+
+  async deleteCustomerProductMargin(_id: string): Promise<boolean> {
+    return false;
   }
 }
 

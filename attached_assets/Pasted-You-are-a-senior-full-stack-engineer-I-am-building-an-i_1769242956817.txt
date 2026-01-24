@@ -1,0 +1,125 @@
+You are a senior full-stack engineer.
+
+I am building an invoicing application.
+Implement an Advanced Price Rule feature that works for BOTH Sales Orders and Sales Invoices.
+
+========================
+BUSINESS REQUIREMENTS
+========================
+
+1) Sales price must be auto-calculated based on:
+   Latest Purchase Price + Margin %
+
+2) Latest purchase price is determined by:
+   - Highest purchase_date (and timestamp if same date)
+   - Effective from purchase date onward
+   - Older sales orders/invoices must NOT be recalculated
+
+3) SAME pricing logic must apply to:
+   - Sales Order
+   - Sales Invoice
+
+========================
+MARGIN PRIORITY LOGIC
+========================
+
+When calculating sales price, margin must be selected in the following order (highest priority first):
+
+1. Customer + Product specific margin
+2. Customer default margin
+3. Product default margin
+4. Global default margin
+
+First match wins. Margins must NOT be combined.
+
+========================
+PRICING FORMULA
+========================
+
+sales_price = latest_purchase_price × (1 + margin_percentage / 100)
+
+========================
+EXAMPLE
+========================
+
+Product: Hing
+Latest Purchase Date: 20-Jan-2026
+Latest Purchase Price: $120
+
+Margins:
+- 10 customers → 30%
+- 5 customers → 20%
+
+Expected result:
+- Customers with 30% margin → $156
+- Customers with 20% margin → $144
+
+========================
+DATABASE STRUCTURE
+========================
+
+Product Table:
+- id
+- name
+- default_margin_percent
+
+Customer Table:
+- id
+- name
+- default_margin_percent
+
+Customer_Product_Margin Table:
+- id
+- customer_id
+- product_id
+- margin_percent
+
+Purchase Table:
+- id
+- product_id
+- purchase_date
+- unit_cost
+- created_at
+
+Sales Order Table:
+- id
+- customer_id
+- order_date
+
+Sales Invoice Table:
+- id
+- customer_id
+- invoice_date
+
+========================
+FUNCTIONAL REQUIREMENTS
+========================
+
+1) Create a reusable pricing function:
+   getSalesPrice(product_id, customer_id, document_date)
+
+2) This function must:
+   - Fetch latest purchase on or before document_date
+   - Resolve margin using priority rules
+   - Return calculated sales price
+
+3) Auto-populate product rate when added to:
+   - Sales Order
+   - Sales Invoice
+
+4) Allow manual override of price without updating margin rules
+
+5) Add inline comments explaining pricing logic
+
+========================
+OUTPUT EXPECTATION
+========================
+
+- Provide backend logic (API/service)
+- Provide database queries or ORM logic
+- Provide example usage in Sales Order & Invoice creation
+- Keep code clean, modular, and production-ready
+- Use best practices and clear variable names
+
+DO NOT simplify the logic.
+DO NOT skip edge cases.

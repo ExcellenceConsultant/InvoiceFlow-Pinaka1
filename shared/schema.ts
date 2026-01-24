@@ -57,6 +57,7 @@ export const customers = pgTable("customers", {
   }>(),
   type: text("type").notNull().default("customer"), // "customer" or "vendor"
   isActive: boolean("is_active").default(true),
+  defaultMarginPercent: decimal("default_margin_percent", { precision: 5, scale: 2 }), // Customer default margin for pricing
   quickbooksCustomerId: text("quickbooks_customer_id"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
@@ -86,6 +87,19 @@ export const products = pgTable("products", {
   quickbooksItemId: text("quickbooks_item_id"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Customer-Product Margin table for specific margin rules per customer-product combination
+// Used in Advanced Price Rule feature to calculate sales prices
+export const customerProductMargins = pgTable("customer_product_margins", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  productId: varchar("product_id").references(() => products.id).notNull(),
+  marginPercent: decimal("margin_percent", { precision: 5, scale: 2 }).notNull(), // Margin percentage for this customer-product pair
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const productVariants = pgTable("product_variants", {
@@ -304,6 +318,14 @@ export const insertProductVariantSchema = createInsertSchema(
   createdAt: true,
 });
 
+export const insertCustomerProductMarginSchema = createInsertSchema(
+  customerProductMargins,
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertProductSchemeSchema = createInsertSchema(
   productSchemes,
 ).omit({
@@ -385,6 +407,8 @@ export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type ProductVariant = typeof productVariants.$inferSelect;
 export type InsertProductVariant = z.infer<typeof insertProductVariantSchema>;
+export type CustomerProductMargin = typeof customerProductMargins.$inferSelect;
+export type InsertCustomerProductMargin = z.infer<typeof insertCustomerProductMarginSchema>;
 export type ProductScheme = typeof productSchemes.$inferSelect;
 export type InsertProductScheme = z.infer<typeof insertProductSchemeSchema>;
 export type Invoice = typeof invoices.$inferSelect;
