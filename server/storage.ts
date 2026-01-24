@@ -31,6 +31,20 @@ import {
   type InsertCustomerPriceRule,
   type CustomerProductPriceRule,
   type InsertCustomerProductPriceRule,
+  type TaxAgency,
+  type InsertTaxAgency,
+  type TaxRate,
+  type InsertTaxRate,
+  type TaxCode,
+  type InsertTaxCode,
+  type TaxCodeRate,
+  type InsertTaxCodeRate,
+  type ProductTaxCode,
+  type InsertProductTaxCode,
+  type CustomerTaxSettings,
+  type InsertCustomerTaxSettings,
+  type InvoiceTaxDetail,
+  type InsertInvoiceTaxDetail,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -188,6 +202,66 @@ export interface IStorage {
   createCustomerProductPriceRule(rule: InsertCustomerProductPriceRule & { userId: string }): Promise<CustomerProductPriceRule>;
   updateCustomerProductPriceRule(id: string, updates: Partial<CustomerProductPriceRule>): Promise<CustomerProductPriceRule | undefined>;
   deleteCustomerProductPriceRule(id: string): Promise<boolean>;
+
+  // ============================================
+  // SALES TAX CENTER (QuickBooks Aligned)
+  // ============================================
+
+  // Tax Agencies
+  getTaxAgencies(userId: string): Promise<TaxAgency[]>;
+  getTaxAgency(id: string): Promise<TaxAgency | undefined>;
+  getTaxAgencyByQbId(qbTaxAgencyId: string): Promise<TaxAgency | undefined>;
+  createTaxAgency(agency: InsertTaxAgency & { userId: string }): Promise<TaxAgency>;
+  updateTaxAgency(id: string, updates: Partial<TaxAgency>): Promise<TaxAgency | undefined>;
+  deleteTaxAgency(id: string): Promise<boolean>;
+
+  // Tax Rates
+  getTaxRates(userId: string): Promise<TaxRate[]>;
+  getTaxRate(id: string): Promise<TaxRate | undefined>;
+  getTaxRateByQbId(qbTaxRateId: string): Promise<TaxRate | undefined>;
+  getTaxRatesByAgency(taxAgencyId: string): Promise<TaxRate[]>;
+  getActiveTaxRatesForDate(date: Date, userId: string): Promise<TaxRate[]>;
+  createTaxRate(rate: InsertTaxRate & { userId: string }): Promise<TaxRate>;
+  updateTaxRate(id: string, updates: Partial<TaxRate>): Promise<TaxRate | undefined>;
+  deleteTaxRate(id: string): Promise<boolean>;
+
+  // Tax Codes
+  getTaxCodes(userId: string): Promise<TaxCode[]>;
+  getTaxCode(id: string): Promise<TaxCode | undefined>;
+  getTaxCodeByQbId(qbTaxCodeId: string): Promise<TaxCode | undefined>;
+  getDefaultTaxCode(userId: string): Promise<TaxCode | undefined>;
+  getNonTaxableTaxCode(userId: string): Promise<TaxCode | undefined>;
+  createTaxCode(code: InsertTaxCode & { userId: string }): Promise<TaxCode>;
+  updateTaxCode(id: string, updates: Partial<TaxCode>): Promise<TaxCode | undefined>;
+  deleteTaxCode(id: string): Promise<boolean>;
+
+  // Tax Code Rates (junction)
+  getTaxCodeRates(taxCodeId: string): Promise<TaxCodeRate[]>;
+  getTaxCodeRatesWithDetails(taxCodeId: string): Promise<(TaxCodeRate & { taxRate: TaxRate })[]>;
+  createTaxCodeRate(rate: InsertTaxCodeRate): Promise<TaxCodeRate>;
+  deleteTaxCodeRate(id: string): Promise<boolean>;
+  deleteTaxCodeRatesByCodeId(taxCodeId: string): Promise<boolean>;
+
+  // Product Tax Codes
+  getProductTaxCodes(userId: string): Promise<ProductTaxCode[]>;
+  getProductTaxCode(productId: string): Promise<ProductTaxCode | undefined>;
+  createProductTaxCode(mapping: InsertProductTaxCode & { userId: string }): Promise<ProductTaxCode>;
+  updateProductTaxCode(id: string, taxCodeId: string): Promise<ProductTaxCode | undefined>;
+  deleteProductTaxCode(id: string): Promise<boolean>;
+
+  // Customer Tax Settings
+  getCustomerTaxSettingsList(userId: string): Promise<CustomerTaxSettings[]>;
+  getCustomerTaxSettings(customerId: string): Promise<CustomerTaxSettings | undefined>;
+  createCustomerTaxSettings(settings: InsertCustomerTaxSettings & { userId: string }): Promise<CustomerTaxSettings>;
+  updateCustomerTaxSettings(id: string, updates: Partial<CustomerTaxSettings>): Promise<CustomerTaxSettings | undefined>;
+  deleteCustomerTaxSettings(id: string): Promise<boolean>;
+
+  // Invoice Tax Details
+  getInvoiceTaxDetails(invoiceId: string): Promise<InvoiceTaxDetail[]>;
+  getInvoiceTaxDetailByLineItem(lineItemId: string): Promise<InvoiceTaxDetail | undefined>;
+  createInvoiceTaxDetail(detail: InsertInvoiceTaxDetail): Promise<InvoiceTaxDetail>;
+  deleteInvoiceTaxDetail(id: string): Promise<boolean>;
+  deleteInvoiceTaxDetailsByInvoiceId(invoiceId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {

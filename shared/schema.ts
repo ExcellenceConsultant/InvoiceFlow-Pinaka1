@@ -497,6 +497,169 @@ export const insertOrderLineItemSchema = createInsertSchema(
 });
 
 // Types
+// ============================================
+// SALES TAX CENTER TABLES (QuickBooks Aligned)
+// ============================================
+
+// Tax Agency - represents tax collection authorities (state/county/city)
+// QB Alignment: Maps to QuickBooks TaxAgency entity
+export const taxAgencies = pgTable("tax_agencies", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  qbTaxAgencyId: text("qb_tax_agency_id"), // QuickBooks TaxAgency ID for sync
+  agencyName: text("agency_name").notNull(),
+  jurisdictionType: text("jurisdiction_type").notNull().default("STATE"), // STATE, COUNTY, CITY
+  status: text("status").notNull().default("active"), // active, inactive
+  userId: varchar("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Tax Rate - individual tax rate with percentage
+// QB Alignment: Maps to QuickBooks TaxRate entity
+export const taxRates = pgTable("tax_rates", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  qbTaxRateId: text("qb_tax_rate_id"), // QuickBooks TaxRate ID for sync
+  taxName: text("tax_name").notNull(),
+  taxPercentage: decimal("tax_percentage", { precision: 6, scale: 4 }).notNull(), // e.g., 8.2500%
+  jurisdiction: text("jurisdiction"), // State/jurisdiction name
+  taxAgencyId: varchar("tax_agency_id").references(() => taxAgencies.id),
+  effectiveFromDate: timestamp("effective_from_date").notNull(),
+  effectiveToDate: timestamp("effective_to_date"), // null = currently active
+  status: text("status").notNull().default("active"), // active, inactive
+  userId: varchar("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Tax Code - QB style tax code combining multiple rates
+// QB Alignment: Maps to QuickBooks TaxCode entity (e.g., TAX, NON)
+export const taxCodes = pgTable("tax_codes", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  qbTaxCodeId: text("qb_tax_code_id"), // QuickBooks TaxCode ID for sync
+  taxCodeName: text("tax_code_name").notNull(), // e.g., TAX, NON, CA_TAX
+  description: text("description"),
+  isTaxable: boolean("is_taxable").notNull().default(true),
+  isDefault: boolean("is_default").default(false), // Company default tax code
+  status: text("status").notNull().default("active"), // active, inactive
+  userId: varchar("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Tax Code Rates - junction table linking tax codes to multiple rates
+// QB Alignment: Supports combined tax rates (state + local)
+export const taxCodeRates = pgTable("tax_code_rates", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  taxCodeId: varchar("tax_code_id").references(() => taxCodes.id).notNull(),
+  taxRateId: varchar("tax_rate_id").references(() => taxRates.id).notNull(),
+  displayOrder: integer("display_order").default(0), // Order of application
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Product Tax Code Mapping - default tax code for products
+// QB Alignment: Determines which tax code to use for product lines
+export const productTaxCodes = pgTable("product_tax_codes", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").references(() => products.id).notNull(),
+  taxCodeId: varchar("tax_code_id").references(() => taxCodes.id).notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Customer Tax Setup - tax exemption and override settings
+// QB Alignment: Matches QB customer tax settings
+export const customerTaxSettings = pgTable("customer_tax_settings", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  isTaxExempt: boolean("is_tax_exempt").default(false), // Customer is tax exempt
+  taxExemptReason: text("tax_exempt_reason"), // Reason for exemption
+  taxExemptNumber: text("tax_exempt_number"), // Exemption certificate number
+  overrideTaxCodeId: varchar("override_tax_code_id").references(() => taxCodes.id), // Override tax code for this customer
+  userId: varchar("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Invoice Tax Details - stores calculated tax per line item
+// QB Alignment: Records exact tax calculations for QB sync
+export const invoiceTaxDetails = pgTable("invoice_tax_details", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").references(() => invoices.id).notNull(),
+  lineItemId: varchar("line_item_id").references(() => invoiceLineItems.id),
+  taxCodeId: varchar("tax_code_id").references(() => taxCodes.id).notNull(),
+  taxableAmount: decimal("taxable_amount", { precision: 10, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).notNull(),
+  taxPercentageTotal: decimal("tax_percentage_total", { precision: 6, scale: 4 }).notNull(),
+  appliedTaxRates: jsonb("applied_tax_rates").$type<{
+    taxRateId: string;
+    taxName: string;
+    percentage: string;
+    amount: string;
+    taxAgencyId?: string;
+  }[]>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert schemas for Sales Tax tables
+export const insertTaxAgencySchema = createInsertSchema(taxAgencies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaxRateSchema = createInsertSchema(taxRates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaxCodeSchema = createInsertSchema(taxCodes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaxCodeRateSchema = createInsertSchema(taxCodeRates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertProductTaxCodeSchema = createInsertSchema(productTaxCodes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCustomerTaxSettingsSchema = createInsertSchema(customerTaxSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInvoiceTaxDetailSchema = createInsertSchema(invoiceTaxDetails).omit({
+  id: true,
+  createdAt: true,
+});
+
+// ============================================
+// TYPE EXPORTS
+// ============================================
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Customer = typeof customers.$inferSelect;
@@ -534,3 +697,19 @@ export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type OrderLineItem = typeof orderLineItems.$inferSelect;
 export type InsertOrderLineItem = z.infer<typeof insertOrderLineItemSchema>;
+
+// Sales Tax Types
+export type TaxAgency = typeof taxAgencies.$inferSelect;
+export type InsertTaxAgency = z.infer<typeof insertTaxAgencySchema>;
+export type TaxRate = typeof taxRates.$inferSelect;
+export type InsertTaxRate = z.infer<typeof insertTaxRateSchema>;
+export type TaxCode = typeof taxCodes.$inferSelect;
+export type InsertTaxCode = z.infer<typeof insertTaxCodeSchema>;
+export type TaxCodeRate = typeof taxCodeRates.$inferSelect;
+export type InsertTaxCodeRate = z.infer<typeof insertTaxCodeRateSchema>;
+export type ProductTaxCode = typeof productTaxCodes.$inferSelect;
+export type InsertProductTaxCode = z.infer<typeof insertProductTaxCodeSchema>;
+export type CustomerTaxSettings = typeof customerTaxSettings.$inferSelect;
+export type InsertCustomerTaxSettings = z.infer<typeof insertCustomerTaxSettingsSchema>;
+export type InvoiceTaxDetail = typeof invoiceTaxDetails.$inferSelect;
+export type InsertInvoiceTaxDetail = z.infer<typeof insertInvoiceTaxDetailSchema>;

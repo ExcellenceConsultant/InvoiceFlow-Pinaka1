@@ -1,0 +1,176 @@
+You are a senior full-stack engineer.
+
+Enhance the existing **Sales Tax Center** module
+to fully align tax logic with **QuickBooks Online (QBO) Sync**.
+
+The goal is:
+- Internal tax calculation matches QuickBooks behavior
+- Invoice tax data syncs to QBO WITHOUT mismatch errors
+- No change to existing invoice UI or format
+
+================================
+QUICKBOOKS TAX ALIGNMENT GOALS
+================================
+
+1) Use QuickBooks-style tax concepts:
+   - Tax Agency
+   - Tax Rate
+   - Tax Code
+   - Taxable / Non-taxable lines
+
+2) Ensure invoice tax totals in system
+   EXACTLY match what QuickBooks calculates.
+
+================================
+TAX DATA MODEL (QB COMPATIBLE)
+================================
+
+Add / align the following structures:
+
+--------------------------------
+1) TAX AGENCY
+--------------------------------
+Fields:
+- qb_tax_agency_id (string)
+- agency_name
+- jurisdiction_type (STATE / COUNTY / CITY)
+- status
+
+--------------------------------
+2) TAX RATE
+--------------------------------
+Fields:
+- qb_tax_rate_id (string)
+- tax_name
+- tax_percentage
+- jurisdiction
+- effective_from_date
+- status
+
+--------------------------------
+3) TAX CODE (QB STYLE)
+--------------------------------
+Fields:
+- qb_tax_code_id (string)
+- tax_code_name (e.g. TAX, NON)
+- tax_rate_ids (array)
+- is_taxable (boolean)
+
+--------------------------------
+4) PRODUCT TAX CODE MAPPING
+--------------------------------
+Fields:
+- product_id
+- qb_tax_code_id
+
+--------------------------------
+5) CUSTOMER TAX SETUP
+--------------------------------
+Fields:
+- customer_id
+- tax_exempt (boolean)
+- qb_tax_code_id (optional override)
+
+================================
+TAX RESOLUTION PRIORITY (QB STYLE)
+================================
+
+Resolve tax exactly like QuickBooks:
+
+1. If customer is tax_exempt → use NON taxable tax code
+2. If customer has qb_tax_code_id → use it
+3. Else if product has qb_tax_code_id → use it
+4. Else use company default tax code
+
+================================
+STATE-WISE TAX HANDLING
+================================
+
+- Determine state using:
+  1. Shipping state
+  2. Billing state
+- Fetch state tax rates mapped to QB tax codes
+- Respect effective_from_date
+- Do NOT hardcode any tax percentages
+
+================================
+TAX CALCULATION RULES (QB MATCH)
+================================
+
+- Calculate tax per line item (QB behavior)
+- Support multiple tax rates per tax code (state + local)
+- Round tax values using QuickBooks rounding rules
+- Store both:
+  - Line-level tax
+  - Invoice-level tax total
+
+================================
+REUSABLE TAX SERVICE
+================================
+
+Create or extend service:
+
+getQuickBooksSalesTax(
+  product_id,
+  customer_id,
+  invoice_date,
+  taxable_amount,
+  state
+)
+
+Returns:
+- qb_tax_code_id
+- applied_tax_rates
+- tax_percentage_total
+- tax_amount
+- tax_agency_ids
+
+================================
+INVOICE SYNC REQUIREMENTS
+================================
+
+When syncing invoice to QuickBooks:
+
+- Send qb_tax_code_id per line item
+- Send tax_amount exactly as calculated
+- Do NOT let QuickBooks re-calculate tax
+- Prevent sync errors caused by tax mismatch
+
+================================
+SYNC SAFETY RULES
+================================
+
+- If tax config missing → block QB sync with clear error
+- Log tax sync payload for audit
+- Validate tax totals before sync
+
+================================
+DATABASE EXTENSIONS
+================================
+
+Extend existing tables with:
+- qb_tax_agency_id
+- qb_tax_rate_id
+- qb_tax_code_id
+
+Add:
+Invoice_Tax_Detail
+- invoice_id
+- line_id
+- qb_tax_code_id
+- tax_rate_ids
+- tax_amount
+
+================================
+OUTPUT EXPECTATION
+================================
+
+- QuickBooks-aligned Sales Tax logic
+- Zero tax mismatch during QB Sync
+- Backend-only changes (no UI redesign)
+- Clean, scalable, production-ready code
+- Inline comments explaining QB alignment
+
+DO NOT change invoice format.
+DO NOT hardcode tax rates.
+DO NOT allow QuickBooks to recalculate tax.

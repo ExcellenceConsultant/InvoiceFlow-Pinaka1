@@ -10,7 +10,19 @@ import {
   insertProductSchema,
   insertProductSchemeSchema,
   insertProductVariantSchema,
+  insertTaxAgencySchema,
+  insertTaxRateSchema,
+  insertTaxCodeSchema,
+  insertTaxCodeRateSchema,
+  insertProductTaxCodeSchema,
+  insertCustomerTaxSettingsSchema,
 } from "@shared/schema";
+import {
+  getQuickBooksSalesTax,
+  calculateInvoiceTax,
+  validateTaxConfigForSync,
+  recalculateInvoiceTaxDetails,
+} from "./services/tax-calculation";
 import { 
   getSalesPrice, 
   getBatchSalesPrices, 
@@ -3380,23 +3392,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
           // Build invoice line items (exclude 0-quantity scheme placeholders)
+          // QB Alignment: Include tax code references for accurate tax sync
           const qbLineItems = [];
+          const userId = (req as any).user?.id;
+          
+          // Get default and non-taxable tax codes for fallback
+          let defaultTaxCode: any = null;
+          let nonTaxableCode: any = null;
+          try {
+            defaultTaxCode = await storage.getDefaultTaxCode(userId);
+            nonTaxableCode = await storage.getNonTaxableTaxCode(userId);
+          } catch (e) {
+            console.log("Could not fetch default tax codes");
+          }
+          
+          // Get tax details for this invoice if available
+          const taxDetailsMap = new Map<string, any>();
+          try {
+            const taxDetails = await storage.getInvoiceTaxDetails(invoice.id);
+            for (const td of taxDetails) {
+              if (td.lineItemId) {
+                const taxCode = await storage.getTaxCode(td.taxCodeId);
+                taxDetailsMap.set(td.lineItemId, {
+                  ...td,
+                  qbTaxCodeId: taxCode?.qbTaxCodeId,
+                  isTaxable: taxCode?.isTaxable ?? true,
+                });
+              }
+            }
+          } catch (e) {
+            console.log("No tax details found for invoice, will use default tax code");
+          }
+
           for (const item of lineItems) {
             if (!item.productId) continue;
             if (parseFloat(String(item.quantity)) <= 0) continue;
             const product = await storage.getProduct(item.productId);
             if (product && product.quickbooksItemId) {
+              const lineItemDetail: any = {
+                ItemRef: {
+                  value: product.quickbooksItemId,
+                  name: product.name,
+                },
+                UnitPrice: parseFloat(item.unitPrice),
+                Qty: parseFloat(String(item.quantity)),
+              };
+
+              // QB Alignment: ALWAYS set TaxCodeRef on every line item
+              const taxDetail = taxDetailsMap.get(item.id);
+              if (taxDetail && taxDetail.qbTaxCodeId) {
+                // Use the calculated tax code
+                lineItemDetail.TaxCodeRef = {
+                  value: taxDetail.qbTaxCodeId,
+                };
+              } else if (nonTaxableCode?.qbTaxCodeId) {
+                // Fallback to non-taxable code if no tax detail calculated
+                lineItemDetail.TaxCodeRef = {
+                  value: nonTaxableCode.qbTaxCodeId,
+                };
+              } else if (defaultTaxCode?.qbTaxCodeId) {
+                // Last resort: use default tax code
+                lineItemDetail.TaxCodeRef = {
+                  value: defaultTaxCode.qbTaxCodeId,
+                };
+              }
+              // If no qbTaxCodeId is available at all, QB will use its default (less ideal but sync won't fail)
+
               qbLineItems.push({
                 Amount: parseFloat(item.lineTotal),
                 DetailType: "SalesItemLineDetail",
-                SalesItemLineDetail: {
-                  ItemRef: {
-                    value: product.quickbooksItemId,
-                    name: product.name,
-                  },
-                  UnitPrice: parseFloat(item.unitPrice),
-                  Qty: parseFloat(String(item.quantity)),
-                },
+                SalesItemLineDetail: lineItemDetail,
               });
             }
           }
@@ -4946,6 +5011,461 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting customer-product margin:", error);
       res.status(500).json({ message: "Failed to delete margin" });
+    }
+  });
+
+  // ============================================
+  // SALES TAX CENTER API ROUTES (QuickBooks Aligned)
+  // ============================================
+
+  // Tax Agencies
+  app.get("/api/tax/agencies", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const agencies = await storage.getTaxAgencies(userId);
+      res.json(agencies);
+    } catch (error) {
+      console.error("Error getting tax agencies:", error);
+      res.status(500).json({ message: "Failed to get tax agencies" });
+    }
+  });
+
+  app.get("/api/tax/agencies/:id", isAuthenticated, async (req, res) => {
+    try {
+      const agency = await storage.getTaxAgency(req.params.id);
+      if (!agency) return res.status(404).json({ message: "Tax agency not found" });
+      res.json(agency);
+    } catch (error) {
+      console.error("Error getting tax agency:", error);
+      res.status(500).json({ message: "Failed to get tax agency" });
+    }
+  });
+
+  app.post("/api/tax/agencies", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const parsed = insertTaxAgencySchema.parse(req.body);
+      const agency = await storage.createTaxAgency({ ...parsed, userId });
+      res.json(agency);
+    } catch (error) {
+      console.error("Error creating tax agency:", error);
+      res.status(500).json({ message: "Failed to create tax agency" });
+    }
+  });
+
+  app.put("/api/tax/agencies/:id", isAuthenticated, async (req, res) => {
+    try {
+      const agency = await storage.updateTaxAgency(req.params.id, req.body);
+      if (!agency) return res.status(404).json({ message: "Tax agency not found" });
+      res.json(agency);
+    } catch (error) {
+      console.error("Error updating tax agency:", error);
+      res.status(500).json({ message: "Failed to update tax agency" });
+    }
+  });
+
+  app.delete("/api/tax/agencies/:id", isAuthenticated, async (req, res) => {
+    try {
+      const result = await storage.deleteTaxAgency(req.params.id);
+      if (!result) return res.status(404).json({ message: "Tax agency not found" });
+      res.json({ message: "Tax agency deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting tax agency:", error);
+      res.status(500).json({ message: "Failed to delete tax agency" });
+    }
+  });
+
+  // Tax Rates
+  app.get("/api/tax/rates", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const rates = await storage.getTaxRates(userId);
+      res.json(rates);
+    } catch (error) {
+      console.error("Error getting tax rates:", error);
+      res.status(500).json({ message: "Failed to get tax rates" });
+    }
+  });
+
+  app.get("/api/tax/rates/:id", isAuthenticated, async (req, res) => {
+    try {
+      const rate = await storage.getTaxRate(req.params.id);
+      if (!rate) return res.status(404).json({ message: "Tax rate not found" });
+      res.json(rate);
+    } catch (error) {
+      console.error("Error getting tax rate:", error);
+      res.status(500).json({ message: "Failed to get tax rate" });
+    }
+  });
+
+  app.post("/api/tax/rates", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const parsed = insertTaxRateSchema.parse(req.body);
+      const rate = await storage.createTaxRate({ ...parsed, userId });
+      res.json(rate);
+    } catch (error) {
+      console.error("Error creating tax rate:", error);
+      res.status(500).json({ message: "Failed to create tax rate" });
+    }
+  });
+
+  app.put("/api/tax/rates/:id", isAuthenticated, async (req, res) => {
+    try {
+      const rate = await storage.updateTaxRate(req.params.id, req.body);
+      if (!rate) return res.status(404).json({ message: "Tax rate not found" });
+      res.json(rate);
+    } catch (error) {
+      console.error("Error updating tax rate:", error);
+      res.status(500).json({ message: "Failed to update tax rate" });
+    }
+  });
+
+  app.delete("/api/tax/rates/:id", isAuthenticated, async (req, res) => {
+    try {
+      const result = await storage.deleteTaxRate(req.params.id);
+      if (!result) return res.status(404).json({ message: "Tax rate not found" });
+      res.json({ message: "Tax rate deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting tax rate:", error);
+      res.status(500).json({ message: "Failed to delete tax rate" });
+    }
+  });
+
+  // Tax Codes
+  app.get("/api/tax/codes", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const codes = await storage.getTaxCodes(userId);
+      res.json(codes);
+    } catch (error) {
+      console.error("Error getting tax codes:", error);
+      res.status(500).json({ message: "Failed to get tax codes" });
+    }
+  });
+
+  app.get("/api/tax/codes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const code = await storage.getTaxCode(req.params.id);
+      if (!code) return res.status(404).json({ message: "Tax code not found" });
+      res.json(code);
+    } catch (error) {
+      console.error("Error getting tax code:", error);
+      res.status(500).json({ message: "Failed to get tax code" });
+    }
+  });
+
+  app.get("/api/tax/codes/:id/rates", isAuthenticated, async (req, res) => {
+    try {
+      const rates = await storage.getTaxCodeRatesWithDetails(req.params.id);
+      res.json(rates);
+    } catch (error) {
+      console.error("Error getting tax code rates:", error);
+      res.status(500).json({ message: "Failed to get tax code rates" });
+    }
+  });
+
+  app.post("/api/tax/codes", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { taxRateIds, ...codeData } = req.body;
+      const parsed = insertTaxCodeSchema.parse(codeData);
+      const code = await storage.createTaxCode({ ...parsed, userId });
+
+      // Create tax code rate associations if provided
+      if (taxRateIds && Array.isArray(taxRateIds)) {
+        for (let i = 0; i < taxRateIds.length; i++) {
+          await storage.createTaxCodeRate({
+            taxCodeId: code.id,
+            taxRateId: taxRateIds[i],
+            displayOrder: i,
+          });
+        }
+      }
+
+      res.json(code);
+    } catch (error) {
+      console.error("Error creating tax code:", error);
+      res.status(500).json({ message: "Failed to create tax code" });
+    }
+  });
+
+  app.put("/api/tax/codes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { taxRateIds, ...updates } = req.body;
+      const code = await storage.updateTaxCode(req.params.id, updates);
+      if (!code) return res.status(404).json({ message: "Tax code not found" });
+
+      // Update tax code rate associations if provided
+      if (taxRateIds && Array.isArray(taxRateIds)) {
+        await storage.deleteTaxCodeRatesByCodeId(code.id);
+        for (let i = 0; i < taxRateIds.length; i++) {
+          await storage.createTaxCodeRate({
+            taxCodeId: code.id,
+            taxRateId: taxRateIds[i],
+            displayOrder: i,
+          });
+        }
+      }
+
+      res.json(code);
+    } catch (error) {
+      console.error("Error updating tax code:", error);
+      res.status(500).json({ message: "Failed to update tax code" });
+    }
+  });
+
+  app.delete("/api/tax/codes/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteTaxCodeRatesByCodeId(req.params.id);
+      const result = await storage.deleteTaxCode(req.params.id);
+      if (!result) return res.status(404).json({ message: "Tax code not found" });
+      res.json({ message: "Tax code deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting tax code:", error);
+      res.status(500).json({ message: "Failed to delete tax code" });
+    }
+  });
+
+  // Product Tax Codes
+  app.get("/api/tax/product-tax-codes", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const mappings = await storage.getProductTaxCodes(userId);
+      res.json(mappings);
+    } catch (error) {
+      console.error("Error getting product tax codes:", error);
+      res.status(500).json({ message: "Failed to get product tax codes" });
+    }
+  });
+
+  app.get("/api/tax/product-tax-codes/:productId", isAuthenticated, async (req, res) => {
+    try {
+      const mapping = await storage.getProductTaxCode(req.params.productId);
+      res.json(mapping || null);
+    } catch (error) {
+      console.error("Error getting product tax code:", error);
+      res.status(500).json({ message: "Failed to get product tax code" });
+    }
+  });
+
+  app.post("/api/tax/product-tax-codes", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const parsed = insertProductTaxCodeSchema.parse(req.body);
+      const mapping = await storage.createProductTaxCode({ ...parsed, userId });
+      res.json(mapping);
+    } catch (error) {
+      console.error("Error creating product tax code:", error);
+      res.status(500).json({ message: "Failed to create product tax code" });
+    }
+  });
+
+  app.put("/api/tax/product-tax-codes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { taxCodeId } = req.body;
+      if (!taxCodeId) return res.status(400).json({ message: "taxCodeId is required" });
+      const mapping = await storage.updateProductTaxCode(req.params.id, taxCodeId);
+      if (!mapping) return res.status(404).json({ message: "Product tax code not found" });
+      res.json(mapping);
+    } catch (error) {
+      console.error("Error updating product tax code:", error);
+      res.status(500).json({ message: "Failed to update product tax code" });
+    }
+  });
+
+  app.delete("/api/tax/product-tax-codes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const result = await storage.deleteProductTaxCode(req.params.id);
+      if (!result) return res.status(404).json({ message: "Product tax code not found" });
+      res.json({ message: "Product tax code deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting product tax code:", error);
+      res.status(500).json({ message: "Failed to delete product tax code" });
+    }
+  });
+
+  // Customer Tax Settings
+  app.get("/api/tax/customer-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const settings = await storage.getCustomerTaxSettingsList(userId);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error getting customer tax settings:", error);
+      res.status(500).json({ message: "Failed to get customer tax settings" });
+    }
+  });
+
+  app.get("/api/tax/customer-settings/:customerId", isAuthenticated, async (req, res) => {
+    try {
+      const settings = await storage.getCustomerTaxSettings(req.params.customerId);
+      res.json(settings || null);
+    } catch (error) {
+      console.error("Error getting customer tax settings:", error);
+      res.status(500).json({ message: "Failed to get customer tax settings" });
+    }
+  });
+
+  app.post("/api/tax/customer-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const parsed = insertCustomerTaxSettingsSchema.parse(req.body);
+      const settings = await storage.createCustomerTaxSettings({ ...parsed, userId });
+      res.json(settings);
+    } catch (error) {
+      console.error("Error creating customer tax settings:", error);
+      res.status(500).json({ message: "Failed to create customer tax settings" });
+    }
+  });
+
+  app.put("/api/tax/customer-settings/:id", isAuthenticated, async (req, res) => {
+    try {
+      const settings = await storage.updateCustomerTaxSettings(req.params.id, req.body);
+      if (!settings) return res.status(404).json({ message: "Customer tax settings not found" });
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating customer tax settings:", error);
+      res.status(500).json({ message: "Failed to update customer tax settings" });
+    }
+  });
+
+  app.delete("/api/tax/customer-settings/:id", isAuthenticated, async (req, res) => {
+    try {
+      const result = await storage.deleteCustomerTaxSettings(req.params.id);
+      if (!result) return res.status(404).json({ message: "Customer tax settings not found" });
+      res.json({ message: "Customer tax settings deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting customer tax settings:", error);
+      res.status(500).json({ message: "Failed to delete customer tax settings" });
+    }
+  });
+
+  // Tax Calculation Endpoints
+  app.post("/api/tax/calculate", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const { productId, customerId, invoiceDate, taxableAmount, state } = req.body;
+
+      if (!productId || !customerId || !invoiceDate || taxableAmount === undefined) {
+        return res.status(400).json({ 
+          message: "productId, customerId, invoiceDate, and taxableAmount are required" 
+        });
+      }
+
+      const result = await getQuickBooksSalesTax({
+        productId,
+        customerId,
+        invoiceDate: new Date(invoiceDate),
+        taxableAmount: parseFloat(taxableAmount),
+        state,
+        userId,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error calculating tax:", error);
+      res.status(500).json({ message: "Failed to calculate tax" });
+    }
+  });
+
+  app.post("/api/tax/calculate-batch", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const { customerId, invoiceDate, state, lineItems } = req.body;
+
+      if (!customerId || !invoiceDate || !lineItems || !Array.isArray(lineItems)) {
+        return res.status(400).json({ 
+          message: "customerId, invoiceDate, and lineItems array are required" 
+        });
+      }
+
+      const result = await calculateInvoiceTax({
+        customerId,
+        invoiceDate: new Date(invoiceDate),
+        state,
+        userId,
+        lineItems: lineItems.map((item: any) => ({
+          productId: item.productId,
+          taxableAmount: parseFloat(item.taxableAmount || item.lineTotal || 0),
+        })),
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error calculating batch tax:", error);
+      res.status(500).json({ message: "Failed to calculate batch tax" });
+    }
+  });
+
+  app.post("/api/tax/validate-for-sync/:invoiceId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const result = await validateTaxConfigForSync(req.params.invoiceId, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error validating tax config:", error);
+      res.status(500).json({ message: "Failed to validate tax configuration" });
+    }
+  });
+
+  // Invoice Tax Details
+  app.get("/api/tax/invoice-details/:invoiceId", isAuthenticated, async (req, res) => {
+    try {
+      const details = await storage.getInvoiceTaxDetails(req.params.invoiceId);
+      res.json(details);
+    } catch (error) {
+      console.error("Error getting invoice tax details:", error);
+      res.status(500).json({ message: "Failed to get invoice tax details" });
+    }
+  });
+
+  app.post("/api/tax/recalculate-invoice/:invoiceId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const invoice = await storage.getInvoice(req.params.invoiceId);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!invoice.customerId) return res.status(400).json({ message: "Invoice has no customer" });
+
+      const lineItems = await storage.getInvoiceLineItems(req.params.invoiceId);
+      const lineItemsForCalc = lineItems
+        .filter(li => li.productId)
+        .map(li => ({
+          id: li.id,
+          productId: li.productId!,
+          lineTotal: parseFloat(li.lineTotal),
+        }));
+
+      const result = await recalculateInvoiceTaxDetails(
+        req.params.invoiceId,
+        invoice.customerId,
+        new Date(invoice.invoiceDate),
+        lineItemsForCalc,
+        userId
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error recalculating invoice tax:", error);
+      res.status(500).json({ message: "Failed to recalculate invoice tax" });
     }
   });
 

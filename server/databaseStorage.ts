@@ -16,6 +16,13 @@ import {
   productPriceRule,
   customerPriceRule,
   customerProductPriceRule,
+  taxAgencies,
+  taxRates,
+  taxCodes,
+  taxCodeRates,
+  productTaxCodes,
+  customerTaxSettings,
+  invoiceTaxDetails,
   type CreditMemo,
   type CreditMemoLineItem,
   type Customer,
@@ -48,8 +55,22 @@ import {
   type InsertCustomerPriceRule,
   type CustomerProductPriceRule,
   type InsertCustomerProductPriceRule,
+  type TaxAgency,
+  type InsertTaxAgency,
+  type TaxRate,
+  type InsertTaxRate,
+  type TaxCode,
+  type InsertTaxCode,
+  type TaxCodeRate,
+  type InsertTaxCodeRate,
+  type ProductTaxCode,
+  type InsertProductTaxCode,
+  type CustomerTaxSettings,
+  type InsertCustomerTaxSettings,
+  type InvoiceTaxDetail,
+  type InsertInvoiceTaxDetail,
 } from "@shared/schema";
-import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, lte, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import { IStorage } from "./storage";
 
@@ -1043,5 +1064,284 @@ export class DatabaseStorage implements IStorage {
       .delete(customerProductPriceRule)
       .where(eq(customerProductPriceRule.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  // ============================================
+  // SALES TAX CENTER (QuickBooks Aligned)
+  // ============================================
+
+  // Tax Agencies
+  async getTaxAgencies(userId: string): Promise<TaxAgency[]> {
+    await this.ensureInitialized();
+    return await db.select().from(taxAgencies).where(eq(taxAgencies.userId, userId));
+  }
+
+  async getTaxAgency(id: string): Promise<TaxAgency | undefined> {
+    await this.ensureInitialized();
+    const [agency] = await db.select().from(taxAgencies).where(eq(taxAgencies.id, id)).limit(1);
+    return agency;
+  }
+
+  async getTaxAgencyByQbId(qbTaxAgencyId: string): Promise<TaxAgency | undefined> {
+    await this.ensureInitialized();
+    const [agency] = await db.select().from(taxAgencies).where(eq(taxAgencies.qbTaxAgencyId, qbTaxAgencyId)).limit(1);
+    return agency;
+  }
+
+  async createTaxAgency(agencyData: InsertTaxAgency & { userId: string }): Promise<TaxAgency> {
+    await this.ensureInitialized();
+    const [agency] = await db.insert(taxAgencies).values(agencyData).returning();
+    return agency;
+  }
+
+  async updateTaxAgency(id: string, updates: Partial<TaxAgency>): Promise<TaxAgency | undefined> {
+    await this.ensureInitialized();
+    const [agency] = await db.update(taxAgencies).set({ ...updates, updatedAt: new Date() }).where(eq(taxAgencies.id, id)).returning();
+    return agency;
+  }
+
+  async deleteTaxAgency(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db.delete(taxAgencies).where(eq(taxAgencies.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Tax Rates
+  async getTaxRates(userId: string): Promise<TaxRate[]> {
+    await this.ensureInitialized();
+    return await db.select().from(taxRates).where(eq(taxRates.userId, userId));
+  }
+
+  async getTaxRate(id: string): Promise<TaxRate | undefined> {
+    await this.ensureInitialized();
+    const [rate] = await db.select().from(taxRates).where(eq(taxRates.id, id)).limit(1);
+    return rate;
+  }
+
+  async getTaxRateByQbId(qbTaxRateId: string): Promise<TaxRate | undefined> {
+    await this.ensureInitialized();
+    const [rate] = await db.select().from(taxRates).where(eq(taxRates.qbTaxRateId, qbTaxRateId)).limit(1);
+    return rate;
+  }
+
+  async getTaxRatesByAgency(taxAgencyId: string): Promise<TaxRate[]> {
+    await this.ensureInitialized();
+    return await db.select().from(taxRates).where(eq(taxRates.taxAgencyId, taxAgencyId));
+  }
+
+  async getActiveTaxRatesForDate(date: Date, userId: string): Promise<TaxRate[]> {
+    await this.ensureInitialized();
+    // QB Alignment: Get tax rates active on the given date (effectiveFromDate <= date AND (effectiveToDate is null OR effectiveToDate >= date))
+    return await db.select().from(taxRates).where(
+      and(
+        eq(taxRates.userId, userId),
+        eq(taxRates.status, "active"),
+        lte(taxRates.effectiveFromDate, date),
+        or(
+          isNull(taxRates.effectiveToDate),
+          gte(taxRates.effectiveToDate, date)
+        )
+      )
+    );
+  }
+
+  async createTaxRate(rateData: InsertTaxRate & { userId: string }): Promise<TaxRate> {
+    await this.ensureInitialized();
+    const [rate] = await db.insert(taxRates).values(rateData).returning();
+    return rate;
+  }
+
+  async updateTaxRate(id: string, updates: Partial<TaxRate>): Promise<TaxRate | undefined> {
+    await this.ensureInitialized();
+    const [rate] = await db.update(taxRates).set({ ...updates, updatedAt: new Date() }).where(eq(taxRates.id, id)).returning();
+    return rate;
+  }
+
+  async deleteTaxRate(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db.delete(taxRates).where(eq(taxRates.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Tax Codes
+  async getTaxCodes(userId: string): Promise<TaxCode[]> {
+    await this.ensureInitialized();
+    return await db.select().from(taxCodes).where(eq(taxCodes.userId, userId));
+  }
+
+  async getTaxCode(id: string): Promise<TaxCode | undefined> {
+    await this.ensureInitialized();
+    const [code] = await db.select().from(taxCodes).where(eq(taxCodes.id, id)).limit(1);
+    return code;
+  }
+
+  async getTaxCodeByQbId(qbTaxCodeId: string): Promise<TaxCode | undefined> {
+    await this.ensureInitialized();
+    const [code] = await db.select().from(taxCodes).where(eq(taxCodes.qbTaxCodeId, qbTaxCodeId)).limit(1);
+    return code;
+  }
+
+  async getDefaultTaxCode(userId: string): Promise<TaxCode | undefined> {
+    await this.ensureInitialized();
+    // QB Alignment: Returns the company default tax code
+    const [code] = await db.select().from(taxCodes).where(
+      and(eq(taxCodes.userId, userId), eq(taxCodes.isDefault, true), eq(taxCodes.status, "active"))
+    ).limit(1);
+    return code;
+  }
+
+  async getNonTaxableTaxCode(userId: string): Promise<TaxCode | undefined> {
+    await this.ensureInitialized();
+    // QB Alignment: Returns the NON taxable tax code (isTaxable = false)
+    const [code] = await db.select().from(taxCodes).where(
+      and(eq(taxCodes.userId, userId), eq(taxCodes.isTaxable, false), eq(taxCodes.status, "active"))
+    ).limit(1);
+    return code;
+  }
+
+  async createTaxCode(codeData: InsertTaxCode & { userId: string }): Promise<TaxCode> {
+    await this.ensureInitialized();
+    const [code] = await db.insert(taxCodes).values(codeData).returning();
+    return code;
+  }
+
+  async updateTaxCode(id: string, updates: Partial<TaxCode>): Promise<TaxCode | undefined> {
+    await this.ensureInitialized();
+    const [code] = await db.update(taxCodes).set({ ...updates, updatedAt: new Date() }).where(eq(taxCodes.id, id)).returning();
+    return code;
+  }
+
+  async deleteTaxCode(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db.delete(taxCodes).where(eq(taxCodes.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Tax Code Rates (junction table)
+  async getTaxCodeRates(taxCodeId: string): Promise<TaxCodeRate[]> {
+    await this.ensureInitialized();
+    return await db.select().from(taxCodeRates).where(eq(taxCodeRates.taxCodeId, taxCodeId)).orderBy(asc(taxCodeRates.displayOrder));
+  }
+
+  async getTaxCodeRatesWithDetails(taxCodeId: string): Promise<(TaxCodeRate & { taxRate: TaxRate })[]> {
+    await this.ensureInitialized();
+    // Join tax code rates with tax rates to get full details
+    const results = await db.select({
+      taxCodeRate: taxCodeRates,
+      taxRate: taxRates,
+    }).from(taxCodeRates)
+      .innerJoin(taxRates, eq(taxCodeRates.taxRateId, taxRates.id))
+      .where(eq(taxCodeRates.taxCodeId, taxCodeId))
+      .orderBy(asc(taxCodeRates.displayOrder));
+    
+    return results.map(r => ({ ...r.taxCodeRate, taxRate: r.taxRate }));
+  }
+
+  async createTaxCodeRate(rateData: InsertTaxCodeRate): Promise<TaxCodeRate> {
+    await this.ensureInitialized();
+    const [rate] = await db.insert(taxCodeRates).values(rateData).returning();
+    return rate;
+  }
+
+  async deleteTaxCodeRate(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db.delete(taxCodeRates).where(eq(taxCodeRates.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async deleteTaxCodeRatesByCodeId(taxCodeId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db.delete(taxCodeRates).where(eq(taxCodeRates.taxCodeId, taxCodeId));
+    return true;
+  }
+
+  // Product Tax Codes
+  async getProductTaxCodes(userId: string): Promise<ProductTaxCode[]> {
+    await this.ensureInitialized();
+    return await db.select().from(productTaxCodes).where(eq(productTaxCodes.userId, userId));
+  }
+
+  async getProductTaxCode(productId: string): Promise<ProductTaxCode | undefined> {
+    await this.ensureInitialized();
+    const [mapping] = await db.select().from(productTaxCodes).where(eq(productTaxCodes.productId, productId)).limit(1);
+    return mapping;
+  }
+
+  async createProductTaxCode(mappingData: InsertProductTaxCode & { userId: string }): Promise<ProductTaxCode> {
+    await this.ensureInitialized();
+    const [mapping] = await db.insert(productTaxCodes).values(mappingData).returning();
+    return mapping;
+  }
+
+  async updateProductTaxCode(id: string, taxCodeId: string): Promise<ProductTaxCode | undefined> {
+    await this.ensureInitialized();
+    const [mapping] = await db.update(productTaxCodes).set({ taxCodeId, updatedAt: new Date() }).where(eq(productTaxCodes.id, id)).returning();
+    return mapping;
+  }
+
+  async deleteProductTaxCode(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db.delete(productTaxCodes).where(eq(productTaxCodes.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Customer Tax Settings
+  async getCustomerTaxSettingsList(userId: string): Promise<CustomerTaxSettings[]> {
+    await this.ensureInitialized();
+    return await db.select().from(customerTaxSettings).where(eq(customerTaxSettings.userId, userId));
+  }
+
+  async getCustomerTaxSettings(customerId: string): Promise<CustomerTaxSettings | undefined> {
+    await this.ensureInitialized();
+    const [settings] = await db.select().from(customerTaxSettings).where(eq(customerTaxSettings.customerId, customerId)).limit(1);
+    return settings;
+  }
+
+  async createCustomerTaxSettings(settingsData: InsertCustomerTaxSettings & { userId: string }): Promise<CustomerTaxSettings> {
+    await this.ensureInitialized();
+    const [settings] = await db.insert(customerTaxSettings).values(settingsData).returning();
+    return settings;
+  }
+
+  async updateCustomerTaxSettings(id: string, updates: Partial<CustomerTaxSettings>): Promise<CustomerTaxSettings | undefined> {
+    await this.ensureInitialized();
+    const [settings] = await db.update(customerTaxSettings).set({ ...updates, updatedAt: new Date() }).where(eq(customerTaxSettings.id, id)).returning();
+    return settings;
+  }
+
+  async deleteCustomerTaxSettings(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db.delete(customerTaxSettings).where(eq(customerTaxSettings.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Invoice Tax Details
+  async getInvoiceTaxDetails(invoiceId: string): Promise<InvoiceTaxDetail[]> {
+    await this.ensureInitialized();
+    return await db.select().from(invoiceTaxDetails).where(eq(invoiceTaxDetails.invoiceId, invoiceId));
+  }
+
+  async getInvoiceTaxDetailByLineItem(lineItemId: string): Promise<InvoiceTaxDetail | undefined> {
+    await this.ensureInitialized();
+    const [detail] = await db.select().from(invoiceTaxDetails).where(eq(invoiceTaxDetails.lineItemId, lineItemId)).limit(1);
+    return detail;
+  }
+
+  async createInvoiceTaxDetail(detailData: InsertInvoiceTaxDetail): Promise<InvoiceTaxDetail> {
+    await this.ensureInitialized();
+    const [detail] = await db.insert(invoiceTaxDetails).values(detailData).returning();
+    return detail;
+  }
+
+  async deleteInvoiceTaxDetail(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db.delete(invoiceTaxDetails).where(eq(invoiceTaxDetails.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async deleteInvoiceTaxDetailsByInvoiceId(invoiceId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    await db.delete(invoiceTaxDetails).where(eq(invoiceTaxDetails.invoiceId, invoiceId));
+    return true;
   }
 }

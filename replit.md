@@ -45,6 +45,20 @@ Implements OAuth 2.0 integration with QuickBooks for accessing APIs, including s
 - **Packing List Generation**: PDF generation displaying CARTOON BARCODE, with smart pagination (25 rows per page, category headers duplicated).
 - **Promotional Schemes**: Buy X get Y free functionality with intelligent edit-mode preservation. When editing invoices, promotional free items remain exactly where they were saved. Free items are automatically removed if main product quantity falls below scheme threshold (e.g., changing from 20 to 19 items). Users can manually change or remove free items at any time.
 - **Role-Based Account Management**: Restrictions on delete and inactive operations for `super_admin` and `admin` roles.
+- **Sales Tax Center (QuickBooks Aligned)**: Comprehensive tax management system that exactly matches QuickBooks Online tax behavior for zero-mismatch sync:
+  - **Tax Agencies**: Track tax collection authorities by jurisdiction (State/County/City)
+  - **Tax Rates**: Individual rates with percentages, effective date ranges, and agency associations
+  - **Tax Codes**: QB-style combined tax codes (e.g., TAX, NON) linking multiple rates
+  - **Product Tax Codes**: Default tax code mappings per product
+  - **Customer Tax Settings**: Tax exemption status, exemption certificates, and override tax codes
+  - **Tax Calculation Service**: `getQuickBooksSalesTax()` resolves tax exactly like QuickBooks:
+    1. If customer is tax_exempt → use NON taxable tax code
+    2. If customer has override_tax_code_id → use it
+    3. If product has tax_code_id → use it
+    4. Else use company default tax code
+  - **QB Rounding**: Uses banker's rounding (round half to even) matching QB calculation
+  - **API Endpoints**: `/api/tax/agencies`, `/api/tax/rates`, `/api/tax/codes`, `/api/tax/customer-settings`, `/api/tax/product-tax-codes`, `/api/tax/calculate`, `/api/tax/calculate-batch`
+  - **Invoice Tax Details**: Records per-line-item tax calculations for accurate QB sync with TaxCodeRef
 
 ## External Dependencies
 
