@@ -112,10 +112,10 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
 
       // Load line items from API
       if (order.id) {
-        fetch(`/api/orders/${order.id}/line-items`)
+        fetch(`/api/orders/${order.id}/line-items`, { credentials: 'include' })
           .then((res) => res.json())
           .then((items) => {
-            if (items && items.length > 0) {
+            if (items && Array.isArray(items) && items.length > 0) {
               setLineItems(
                 items.map((item: any) => ({
                   productId: item.productId || "",
@@ -132,12 +132,21 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
                   category: item.category || "",
                 }))
               );
+            } else {
+              // No items found, add a default empty row
+              setLineItems([createEmptyLineItem()]);
             }
             setLineItemsLoaded(true);
           })
-          .catch(() => {
+          .catch((err) => {
+            console.error("Error fetching line items:", err);
+            setLineItems([createEmptyLineItem()]);
             setLineItemsLoaded(true);
           });
+      } else {
+        // No order ID, add default empty row
+        setLineItems([createEmptyLineItem()]);
+        setLineItemsLoaded(true);
       }
     } else if (!isEditMode) {
       // For new orders, initialize with one empty line item
