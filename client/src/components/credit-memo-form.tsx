@@ -152,6 +152,20 @@ export default function CreditMemoForm({
     queryKey: ["/api/customers"],
   });
 
+  // Watch invoiceType to filter customers/vendors appropriately
+  const watchedInvoiceType = form.watch("invoiceType");
+  
+  // Filter parties based on credit memo type: customers for receivable (Customer Credit), vendors for payable (Vendor Credit)
+  const filteredParties = customers?.filter((c: any) => {
+    if (c.isActive === false) return false;
+    if (watchedInvoiceType === "receivable") {
+      return c.type === "customer";
+    } else if (watchedInvoiceType === "payable") {
+      return c.type === "vendor";
+    }
+    return true;
+  }) || [];
+
   const { data: products, isLoading: productsLoading } = useQuery<any[]>({
     queryKey: ["/api/products"],
   });
@@ -703,20 +717,20 @@ export default function CreditMemoForm({
                   name="customerId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Customer/Vendor</FormLabel>
+                      <FormLabel>{watchedInvoiceType === "payable" ? "Vendor" : "Customer"}</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-customer">
-                            <SelectValue placeholder="Select Customer/Vendor" />
+                            <SelectValue placeholder={watchedInvoiceType === "payable" ? "Select Vendor" : "Select Customer"} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <div className="px-2 pb-2">
                             <Input
-                              placeholder="Search customer..."
+                              placeholder={watchedInvoiceType === "payable" ? "Search vendor..." : "Search customer..."}
                               value={customerSearchTerm}
                               onChange={(e) =>
                                 setCustomerSearchTerm(e.target.value)
@@ -726,19 +740,19 @@ export default function CreditMemoForm({
                               onKeyDown={(e) => e.stopPropagation()}
                             />
                           </div>
-                          {customers
-                            ?.filter((customer: any) =>
-                              customer.name
+                          {filteredParties
+                            .filter((party: any) =>
+                              party.name
                                 .toLowerCase()
                                 .includes(customerSearchTerm.toLowerCase()),
                             )
-                            .map((customer: any) => (
+                            .map((party: any) => (
                               <SelectItem
-                                key={customer.id}
-                                value={customer.id}
-                                data-testid={`option-customer-${customer.id}`}
+                                key={party.id}
+                                value={party.id}
+                                data-testid={`option-customer-${party.id}`}
                               >
-                                {customer.name}
+                                {party.name}
                               </SelectItem>
                             ))}
                         </SelectContent>

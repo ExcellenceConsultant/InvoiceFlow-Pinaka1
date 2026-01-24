@@ -180,6 +180,20 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
     queryKey: ["/api/customers"],
   });
 
+  // Watch invoiceType to filter customers/vendors appropriately
+  const watchedInvoiceType = form.watch("invoiceType");
+  
+  // Filter parties based on invoice type: customers for AR (receivable), vendors for AP (payable)
+  const filteredParties = customers?.filter((c: any) => {
+    if (c.isActive === false) return false;
+    if (watchedInvoiceType === "receivable") {
+      return c.type === "customer";
+    } else if (watchedInvoiceType === "payable") {
+      return c.type === "vendor";
+    }
+    return true;
+  }) || [];
+
   const {
     data: products,
     isLoading: productsLoading,
@@ -848,27 +862,27 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
                 />
               </div>
 
-              {/* Customer and Date Fields */}
+              {/* Customer/Vendor and Date Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="customerId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Customer/Vendor</FormLabel>
+                      <FormLabel>{watchedInvoiceType === "payable" ? "Vendor" : "Customer"}</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-customer">
-                            <SelectValue placeholder="Select Customer/Vendor" />
+                            <SelectValue placeholder={watchedInvoiceType === "payable" ? "Select Vendor" : "Select Customer"} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <div className="px-2 pb-2">
                             <Input
-                              placeholder="Search customer..."
+                              placeholder={watchedInvoiceType === "payable" ? "Search vendor..." : "Search customer..."}
                               value={customerSearchTerm}
                               onChange={(e) =>
                                 setCustomerSearchTerm(e.target.value)
@@ -878,19 +892,19 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
                               onKeyDown={(e) => e.stopPropagation()}
                             />
                           </div>
-                          {customers
-                            ?.filter((customer: any) =>
-                              customer.name
+                          {filteredParties
+                            .filter((party: any) =>
+                              party.name
                                 .toLowerCase()
                                 .includes(customerSearchTerm.toLowerCase()),
                             )
-                            .map((customer: any) => (
+                            .map((party: any) => (
                               <SelectItem
-                                key={customer.id}
-                                value={customer.id}
-                                data-testid={`option-customer-${customer.id}`}
+                                key={party.id}
+                                value={party.id}
+                                data-testid={`option-customer-${party.id}`}
                               >
-                                {customer.name}
+                                {party.name}
                               </SelectItem>
                             ))}
                         </SelectContent>
