@@ -615,11 +615,11 @@ function InvoiceView() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setLocation("/invoices")}
+          onClick={() => setLocation("/business")}
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Invoices
+          Back to Business
         </Button>
         <div className="flex gap-2">
           <Button
