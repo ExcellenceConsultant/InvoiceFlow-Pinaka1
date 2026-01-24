@@ -12,7 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, Settings, Package, Users, UserPlus } from "lucide-react";
+import { Plus, Pencil, Trash2, Settings, Package, Users, UserPlus, Check, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface GlobalPriceRuleData {
   id?: string;
@@ -206,9 +208,10 @@ function ProductPriceRuleTab() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<ProductPriceRuleData | null>(null);
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [marginPercent, setMarginPercent] = useState("");
   const [status, setStatus] = useState("active");
+  const [productSearch, setProductSearch] = useState("");
 
   const { data: rules = [], isLoading } = useQuery<ProductPriceRuleData[]>({
     queryKey: ["/api/price-rules/products"],
@@ -218,13 +221,23 @@ function ProductPriceRuleTab() {
     queryKey: ["/api/products"],
   });
 
+  const existingProductIds = new Set(rules.map(r => r.productId));
+  const availableProducts = products.filter(p => !existingProductIds.has(p.id));
+  const filteredProducts = availableProducts.filter(p => 
+    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    (p.itemCode && p.itemCode.toLowerCase().includes(productSearch.toLowerCase()))
+  );
+
   const createMutation = useMutation({
-    mutationFn: async (data: { productId: string; marginPercent: number; status: string }) => {
-      return apiRequest("POST", "/api/price-rules/products", data);
+    mutationFn: async (data: { productIds: string[]; marginPercent: number; status: string }) => {
+      const promises = data.productIds.map(productId => 
+        apiRequest("POST", "/api/price-rules/products", { productId, marginPercent: data.marginPercent, status: data.status })
+      );
+      return Promise.all(promises);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/price-rules/products"] });
-      toast({ title: "Product price rule created" });
+      toast({ title: `${selectedProductIds.length} product price rule(s) created` });
       resetForm();
     },
     onError: () => {
@@ -262,30 +275,48 @@ function ProductPriceRuleTab() {
   const resetForm = () => {
     setIsDialogOpen(false);
     setEditingRule(null);
-    setSelectedProductId("");
+    setSelectedProductIds([]);
     setMarginPercent("");
     setStatus("active");
+    setProductSearch("");
   };
 
-  const handleEdit = (rule: any) => {
+  const handleEdit = (rule: ProductPriceRuleData) => {
     setEditingRule(rule);
-    setSelectedProductId(rule.productId);
+    setSelectedProductIds([rule.productId]);
     setMarginPercent(rule.marginPercent);
     setStatus(rule.status);
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    const data = {
-      productId: selectedProductId,
-      marginPercent: parseFloat(marginPercent),
-      status,
-    };
+  const toggleProduct = (productId: string) => {
+    setSelectedProductIds(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
 
+  const selectAllProducts = () => {
+    setSelectedProductIds(filteredProducts.map(p => p.id));
+  };
+
+  const clearAllProducts = () => {
+    setSelectedProductIds([]);
+  };
+
+  const handleSubmit = () => {
     if (editingRule) {
-      updateMutation.mutate({ id: editingRule.id, data });
+      updateMutation.mutate({ 
+        id: editingRule.id, 
+        data: { marginPercent: parseFloat(marginPercent), status } 
+      });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate({
+        productIds: selectedProductIds,
+        marginPercent: parseFloat(marginPercent),
+        status,
+      });
     }
   };
 
@@ -309,27 +340,62 @@ function ProductPriceRuleTab() {
               Add Rule
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>{editingRule ? "Edit" : "Add"} Product Price Rule</DialogTitle>
               <DialogDescription>
-                Set margin percentage for a specific product
+                {editingRule ? "Update margin percentage for this product" : "Select multiple products and set margin percentage"}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Product</Label>
-                <Select value={selectedProductId} onValueChange={setSelectedProductId} disabled={!!editingRule}>
-                  <SelectTrigger data-testid="select-product">
-                    <SelectValue placeholder="Select a product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((p: any) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name} ({p.itemCode || 'No code'})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!editingRule && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Products ({selectedProductIds.length} selected)</Label>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={selectAllProducts} data-testid="button-select-all-products">
+                        Select All
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={clearAllProducts} data-testid="button-clear-products">
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                  <Input
+                    placeholder="Search products..."
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    data-testid="input-product-search"
+                  />
+                  <ScrollArea className="h-48 border rounded-md p-2">
+                    {filteredProducts.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-4 text-sm">No available products</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredProducts.map((p) => (
+                          <div key={p.id} className="flex items-center space-x-2 py-1">
+                            <Checkbox
+                              id={`product-${p.id}`}
+                              checked={selectedProductIds.includes(p.id)}
+                              onCheckedChange={() => toggleProduct(p.id)}
+                              data-testid={`checkbox-product-${p.id}`}
+                            />
+                            <label htmlFor={`product-${p.id}`} className="text-sm flex-1 cursor-pointer">
+                              {p.name} {p.itemCode && <span className="text-muted-foreground">({p.itemCode})</span>}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
+              )}
+              {editingRule && (
+                <div className="space-y-2">
+                  <Label>Product</Label>
+                  <Input value={editingRule.product?.name || 'Unknown'} disabled />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Margin Percent (%)</Label>
                 <Input
@@ -356,8 +422,12 @@ function ProductPriceRuleTab() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={resetForm}>Cancel</Button>
-              <Button onClick={handleSubmit} disabled={!selectedProductId || !marginPercent} data-testid="button-submit-rule">
-                {editingRule ? "Update" : "Create"}
+              <Button 
+                onClick={handleSubmit} 
+                disabled={(editingRule ? false : selectedProductIds.length === 0) || !marginPercent || createMutation.isPending} 
+                data-testid="button-submit-rule"
+              >
+                {createMutation.isPending ? "Creating..." : editingRule ? "Update" : `Create ${selectedProductIds.length} Rule(s)`}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -412,10 +482,11 @@ function CustomerPriceRuleTab() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<CustomerPriceRuleData | null>(null);
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [marginPercent, setMarginPercent] = useState("");
-  const [effectiveFromDate, setEffectiveFromDate] = useState("");
+  const [effectiveFromDate, setEffectiveFromDate] = useState(new Date().toISOString().split('T')[0]);
   const [status, setStatus] = useState("active");
+  const [customerSearch, setCustomerSearch] = useState("");
 
   const { data: rules = [], isLoading } = useQuery<CustomerPriceRuleData[]>({
     queryKey: ["/api/price-rules/customers"],
@@ -425,13 +496,21 @@ function CustomerPriceRuleTab() {
     queryKey: ["/api/customers"],
   });
 
+  const customerList = customers.filter((c) => c.type === "customer");
+  const filteredCustomers = customerList.filter(c => 
+    c.name.toLowerCase().includes(customerSearch.toLowerCase())
+  );
+
   const createMutation = useMutation({
-    mutationFn: async (data: { customerId: string; marginPercent: number; effectiveFromDate: string; status: string }) => {
-      return apiRequest("POST", "/api/price-rules/customers", data);
+    mutationFn: async (data: { customerIds: string[]; marginPercent: number; effectiveFromDate: string; status: string }) => {
+      const promises = data.customerIds.map(customerId => 
+        apiRequest("POST", "/api/price-rules/customers", { customerId, marginPercent: data.marginPercent, effectiveFromDate: data.effectiveFromDate, status: data.status })
+      );
+      return Promise.all(promises);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/price-rules/customers"] });
-      toast({ title: "Customer price rule created" });
+      toast({ title: `${selectedCustomerIds.length} customer price rule(s) created` });
       resetForm();
     },
     onError: () => {
@@ -469,38 +548,53 @@ function CustomerPriceRuleTab() {
   const resetForm = () => {
     setIsDialogOpen(false);
     setEditingRule(null);
-    setSelectedCustomerId("");
+    setSelectedCustomerIds([]);
     setMarginPercent("");
     setEffectiveFromDate(new Date().toISOString().split('T')[0]);
     setStatus("active");
+    setCustomerSearch("");
   };
 
-  const handleEdit = (rule: any) => {
+  const handleEdit = (rule: CustomerPriceRuleData) => {
     setEditingRule(rule);
-    setSelectedCustomerId(rule.customerId);
+    setSelectedCustomerIds([rule.customerId]);
     setMarginPercent(rule.marginPercent);
     setEffectiveFromDate(rule.effectiveFromDate?.split('T')[0] || new Date().toISOString().split('T')[0]);
     setStatus(rule.status);
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    const data = {
-      customerId: selectedCustomerId,
-      marginPercent: parseFloat(marginPercent),
-      effectiveFromDate,
-      status,
-    };
-
-    if (editingRule) {
-      updateMutation.mutate({ id: editingRule.id, data });
-    } else {
-      createMutation.mutate(data);
-    }
+  const toggleCustomer = (customerId: string) => {
+    setSelectedCustomerIds(prev => 
+      prev.includes(customerId) 
+        ? prev.filter(id => id !== customerId)
+        : [...prev, customerId]
+    );
   };
 
-  // Filter to only show customers (not vendors)
-  const customerList = customers.filter((c: any) => c.type === "customer");
+  const selectAllCustomers = () => {
+    setSelectedCustomerIds(filteredCustomers.map(c => c.id));
+  };
+
+  const clearAllCustomers = () => {
+    setSelectedCustomerIds([]);
+  };
+
+  const handleSubmit = () => {
+    if (editingRule) {
+      updateMutation.mutate({ 
+        id: editingRule.id, 
+        data: { marginPercent: parseFloat(marginPercent), effectiveFromDate, status } 
+      });
+    } else {
+      createMutation.mutate({
+        customerIds: selectedCustomerIds,
+        marginPercent: parseFloat(marginPercent),
+        effectiveFromDate,
+        status,
+      });
+    }
+  };
 
   if (isLoading) {
     return <Card><CardContent className="p-6">Loading...</CardContent></Card>;
@@ -522,27 +616,62 @@ function CustomerPriceRuleTab() {
               Add Rule
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>{editingRule ? "Edit" : "Add"} Customer Price Rule</DialogTitle>
               <DialogDescription>
-                Set margin percentage for a specific customer
+                {editingRule ? "Update margin percentage for this customer" : "Select multiple customers and set margin percentage"}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Customer</Label>
-                <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId} disabled={!!editingRule}>
-                  <SelectTrigger data-testid="select-customer">
-                    <SelectValue placeholder="Select a customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customerList.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!editingRule && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Customers ({selectedCustomerIds.length} selected)</Label>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={selectAllCustomers} data-testid="button-select-all-customers">
+                        Select All
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={clearAllCustomers} data-testid="button-clear-customers">
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                  <Input
+                    placeholder="Search customers..."
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    data-testid="input-customer-search"
+                  />
+                  <ScrollArea className="h-48 border rounded-md p-2">
+                    {filteredCustomers.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-4 text-sm">No customers found</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredCustomers.map((c) => (
+                          <div key={c.id} className="flex items-center space-x-2 py-1">
+                            <Checkbox
+                              id={`customer-${c.id}`}
+                              checked={selectedCustomerIds.includes(c.id)}
+                              onCheckedChange={() => toggleCustomer(c.id)}
+                              data-testid={`checkbox-customer-${c.id}`}
+                            />
+                            <label htmlFor={`customer-${c.id}`} className="text-sm flex-1 cursor-pointer">
+                              {c.name}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
+              )}
+              {editingRule && (
+                <div className="space-y-2">
+                  <Label>Customer</Label>
+                  <Input value={editingRule.customer?.name || 'Unknown'} disabled />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Margin Percent (%)</Label>
                 <Input
@@ -578,8 +707,12 @@ function CustomerPriceRuleTab() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={resetForm}>Cancel</Button>
-              <Button onClick={handleSubmit} disabled={!selectedCustomerId || !marginPercent || !effectiveFromDate} data-testid="button-submit-rule">
-                {editingRule ? "Update" : "Create"}
+              <Button 
+                onClick={handleSubmit} 
+                disabled={(editingRule ? false : selectedCustomerIds.length === 0) || !marginPercent || !effectiveFromDate || createMutation.isPending} 
+                data-testid="button-submit-rule"
+              >
+                {createMutation.isPending ? "Creating..." : editingRule ? "Update" : `Create ${selectedCustomerIds.length} Rule(s)`}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -634,11 +767,13 @@ function CustomerProductPriceRuleTab() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<CustomerProductPriceRuleData | null>(null);
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [marginPercent, setMarginPercent] = useState("");
-  const [effectiveFromDate, setEffectiveFromDate] = useState("");
+  const [effectiveFromDate, setEffectiveFromDate] = useState(new Date().toISOString().split('T')[0]);
   const [status, setStatus] = useState("active");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
 
   const { data: rules = [], isLoading } = useQuery<CustomerProductPriceRuleData[]>({
     queryKey: ["/api/price-rules/customer-products"],
@@ -652,17 +787,42 @@ function CustomerProductPriceRuleTab() {
     queryKey: ["/api/products"],
   });
 
+  const customerList = customers.filter((c) => c.type === "customer");
+  const filteredCustomers = customerList.filter(c => 
+    c.name.toLowerCase().includes(customerSearch.toLowerCase())
+  );
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    (p.itemCode && p.itemCode.toLowerCase().includes(productSearch.toLowerCase()))
+  );
+
   const createMutation = useMutation({
-    mutationFn: async (data: { customerId: string; productId: string; marginPercent: number; effectiveFromDate: string; status: string }) => {
-      return apiRequest("POST", "/api/price-rules/customer-products", data);
+    mutationFn: async (data: { customerIds: string[]; productIds: string[]; marginPercent: number; effectiveFromDate: string; status: string }) => {
+      const combinations: { customerId: string; productId: string }[] = [];
+      data.customerIds.forEach(customerId => {
+        data.productIds.forEach(productId => {
+          combinations.push({ customerId, productId });
+        });
+      });
+      const promises = combinations.map(combo => 
+        apiRequest("POST", "/api/price-rules/customer-products", { 
+          customerId: combo.customerId, 
+          productId: combo.productId, 
+          marginPercent: data.marginPercent, 
+          effectiveFromDate: data.effectiveFromDate, 
+          status: data.status 
+        })
+      );
+      return Promise.all(promises);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/price-rules/customer-products"] });
-      toast({ title: "Customer+Product price rule created" });
+      const count = selectedCustomerIds.length * selectedProductIds.length;
+      toast({ title: `${count} customer+product price rule(s) created` });
       resetForm();
     },
     onError: () => {
-      toast({ title: "Failed to create rule", variant: "destructive" });
+      toast({ title: "Failed to create rules (some combinations may already exist)", variant: "destructive" });
     },
   });
 
@@ -696,41 +856,60 @@ function CustomerProductPriceRuleTab() {
   const resetForm = () => {
     setIsDialogOpen(false);
     setEditingRule(null);
-    setSelectedCustomerId("");
-    setSelectedProductId("");
+    setSelectedCustomerIds([]);
+    setSelectedProductIds([]);
     setMarginPercent("");
     setEffectiveFromDate(new Date().toISOString().split('T')[0]);
     setStatus("active");
+    setCustomerSearch("");
+    setProductSearch("");
   };
 
-  const handleEdit = (rule: any) => {
+  const handleEdit = (rule: CustomerProductPriceRuleData) => {
     setEditingRule(rule);
-    setSelectedCustomerId(rule.customerId);
-    setSelectedProductId(rule.productId);
+    setSelectedCustomerIds([rule.customerId]);
+    setSelectedProductIds([rule.productId]);
     setMarginPercent(rule.marginPercent);
     setEffectiveFromDate(rule.effectiveFromDate?.split('T')[0] || new Date().toISOString().split('T')[0]);
     setStatus(rule.status);
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    const data = {
-      customerId: selectedCustomerId,
-      productId: selectedProductId,
-      marginPercent: parseFloat(marginPercent),
-      effectiveFromDate,
-      status,
-    };
+  const toggleCustomer = (customerId: string) => {
+    setSelectedCustomerIds(prev => 
+      prev.includes(customerId) ? prev.filter(id => id !== customerId) : [...prev, customerId]
+    );
+  };
 
+  const toggleProduct = (productId: string) => {
+    setSelectedProductIds(prev => 
+      prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
+    );
+  };
+
+  const selectAllCustomers = () => setSelectedCustomerIds(filteredCustomers.map(c => c.id));
+  const clearAllCustomers = () => setSelectedCustomerIds([]);
+  const selectAllProducts = () => setSelectedProductIds(filteredProducts.map(p => p.id));
+  const clearAllProducts = () => setSelectedProductIds([]);
+
+  const handleSubmit = () => {
     if (editingRule) {
-      updateMutation.mutate({ id: editingRule.id, data });
+      updateMutation.mutate({ 
+        id: editingRule.id, 
+        data: { marginPercent: parseFloat(marginPercent), effectiveFromDate, status } 
+      });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate({
+        customerIds: selectedCustomerIds,
+        productIds: selectedProductIds,
+        marginPercent: parseFloat(marginPercent),
+        effectiveFromDate,
+        status,
+      });
     }
   };
 
-  // Filter to only show customers (not vendors)
-  const customerList = customers.filter((c: any) => c.type === "customer");
+  const combinationsCount = selectedCustomerIds.length * selectedProductIds.length;
 
   if (isLoading) {
     return <Card><CardContent className="p-6">Loading...</CardContent></Card>;
@@ -752,40 +931,103 @@ function CustomerProductPriceRuleTab() {
               Add Rule
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingRule ? "Edit" : "Add"} Customer + Product Price Rule</DialogTitle>
               <DialogDescription>
-                Set margin percentage for a specific customer and product combination
+                {editingRule 
+                  ? "Update margin percentage for this combination" 
+                  : `Select customers and products to create combinations (${combinationsCount} rule${combinationsCount !== 1 ? 's' : ''} will be created)`
+                }
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Customer</Label>
-                <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId} disabled={!!editingRule}>
-                  <SelectTrigger data-testid="select-customer">
-                    <SelectValue placeholder="Select a customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customerList.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Product</Label>
-                <Select value={selectedProductId} onValueChange={setSelectedProductId} disabled={!!editingRule}>
-                  <SelectTrigger data-testid="select-product">
-                    <SelectValue placeholder="Select a product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((p: any) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name} ({p.itemCode || 'No code'})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!editingRule && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Customers ({selectedCustomerIds.length})</Label>
+                        <div className="flex gap-1">
+                          <Button variant="outline" size="sm" onClick={selectAllCustomers}>All</Button>
+                          <Button variant="outline" size="sm" onClick={clearAllCustomers}>Clear</Button>
+                        </div>
+                      </div>
+                      <Input
+                        placeholder="Search customers..."
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                      />
+                      <ScrollArea className="h-40 border rounded-md p-2">
+                        {filteredCustomers.length === 0 ? (
+                          <p className="text-muted-foreground text-center py-4 text-sm">No customers found</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {filteredCustomers.map((c) => (
+                              <div key={c.id} className="flex items-center space-x-2 py-1">
+                                <Checkbox
+                                  id={`cp-customer-${c.id}`}
+                                  checked={selectedCustomerIds.includes(c.id)}
+                                  onCheckedChange={() => toggleCustomer(c.id)}
+                                />
+                                <label htmlFor={`cp-customer-${c.id}`} className="text-sm flex-1 cursor-pointer truncate">
+                                  {c.name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Products ({selectedProductIds.length})</Label>
+                        <div className="flex gap-1">
+                          <Button variant="outline" size="sm" onClick={selectAllProducts}>All</Button>
+                          <Button variant="outline" size="sm" onClick={clearAllProducts}>Clear</Button>
+                        </div>
+                      </div>
+                      <Input
+                        placeholder="Search products..."
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                      />
+                      <ScrollArea className="h-40 border rounded-md p-2">
+                        {filteredProducts.length === 0 ? (
+                          <p className="text-muted-foreground text-center py-4 text-sm">No products found</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {filteredProducts.map((p) => (
+                              <div key={p.id} className="flex items-center space-x-2 py-1">
+                                <Checkbox
+                                  id={`cp-product-${p.id}`}
+                                  checked={selectedProductIds.includes(p.id)}
+                                  onCheckedChange={() => toggleProduct(p.id)}
+                                />
+                                <label htmlFor={`cp-product-${p.id}`} className="text-sm flex-1 cursor-pointer truncate">
+                                  {p.name} {p.itemCode && <span className="text-muted-foreground">({p.itemCode})</span>}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
+                  </div>
+                </>
+              )}
+              {editingRule && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Customer</Label>
+                    <Input value={editingRule.customer?.name || 'Unknown'} disabled />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Product</Label>
+                    <Input value={editingRule.product?.name || 'Unknown'} disabled />
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Margin Percent (%)</Label>
                 <Input
@@ -821,8 +1063,12 @@ function CustomerProductPriceRuleTab() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={resetForm}>Cancel</Button>
-              <Button onClick={handleSubmit} disabled={!selectedCustomerId || !selectedProductId || !marginPercent || !effectiveFromDate} data-testid="button-submit-rule">
-                {editingRule ? "Update" : "Create"}
+              <Button 
+                onClick={handleSubmit} 
+                disabled={(editingRule ? false : (selectedCustomerIds.length === 0 || selectedProductIds.length === 0)) || !marginPercent || !effectiveFromDate || createMutation.isPending} 
+                data-testid="button-submit-rule"
+              >
+                {createMutation.isPending ? "Creating..." : editingRule ? "Update" : `Create ${combinationsCount} Rule(s)`}
               </Button>
             </DialogFooter>
           </DialogContent>
