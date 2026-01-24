@@ -63,6 +63,21 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
   }>>([]);
   const [lineItemsLoaded, setLineItemsLoaded] = useState(false);
 
+  const createEmptyLineItem = () => ({
+    productId: "",
+    variantId: "",
+    description: "",
+    quantity: 1,
+    unitPrice: 0,
+    lineTotal: 0,
+    productCode: "",
+    cartoonBarcode: "",
+    packingSize: "",
+    grossWeightKgs: 0,
+    netWeightKgs: 0,
+    category: "",
+  });
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -112,63 +127,57 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
 
       // Load line items from API
       if (order.id) {
-        fetch(`/api/orders/${order.id}/line-items`, { credentials: 'include' })
-          .then((res) => res.json())
+        console.log("PO: Fetching line items for order:", order.id);
+        const token = localStorage.getItem("token");
+        fetch(`/api/orders/${order.id}/line-items`, {
+          credentials: 'include',
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        })
+          .then((res) => {
+            console.log("PO: Line items response status:", res.status);
+            return res.json();
+          })
           .then((items) => {
+            console.log("PO: Line items received:", items);
             if (items && Array.isArray(items) && items.length > 0) {
-              setLineItems(
-                items.map((item: any) => ({
-                  productId: item.productId || "",
-                  variantId: item.variantId || "",
-                  description: item.description || "",
-                  quantity: item.quantity || 1,
-                  unitPrice: parseFloat(item.unitPrice) || 0,
-                  lineTotal: parseFloat(item.lineTotal) || 0,
-                  productCode: item.productCode || "",
-                  cartoonBarcode: item.cartoonBarcode || "",
-                  packingSize: item.packingSize || "",
-                  grossWeightKgs: parseFloat(item.grossWeightKgs) || 0,
-                  netWeightKgs: parseFloat(item.netWeightKgs) || 0,
-                  category: item.category || "",
-                }))
-              );
+              const mappedItems = items.map((item: any) => ({
+                productId: item.productId || "",
+                variantId: item.variantId || "",
+                description: item.description || "",
+                quantity: item.quantity || 1,
+                unitPrice: parseFloat(item.unitPrice) || 0,
+                lineTotal: parseFloat(item.lineTotal) || 0,
+                productCode: item.productCode || "",
+                cartoonBarcode: item.cartoonBarcode || "",
+                packingSize: item.packingSize || "",
+                grossWeightKgs: parseFloat(item.grossWeightKgs) || 0,
+                netWeightKgs: parseFloat(item.netWeightKgs) || 0,
+                category: item.category || "",
+              }));
+              console.log("PO: Setting mapped line items:", mappedItems);
+              setLineItems(mappedItems);
             } else {
-              // No items found, add a default empty row
+              console.log("PO: No items found, adding default empty row");
               setLineItems([createEmptyLineItem()]);
             }
             setLineItemsLoaded(true);
           })
           .catch((err) => {
-            console.error("Error fetching line items:", err);
+            console.error("PO: Error fetching line items:", err);
             setLineItems([createEmptyLineItem()]);
             setLineItemsLoaded(true);
           });
       } else {
-        // No order ID, add default empty row
+        console.log("PO: No order ID, adding default empty row");
         setLineItems([createEmptyLineItem()]);
         setLineItemsLoaded(true);
       }
     } else if (!isEditMode) {
-      // For new orders, initialize with one empty line item
+      console.log("PO: Not edit mode, adding default empty row");
       setLineItems([createEmptyLineItem()]);
       setLineItemsLoaded(true);
     }
   }, [order, isEditMode, form]);
-
-  const createEmptyLineItem = () => ({
-    productId: "",
-    variantId: "",
-    description: "",
-    quantity: 1,
-    unitPrice: 0,
-    lineTotal: 0,
-    productCode: "",
-    cartoonBarcode: "",
-    packingSize: "",
-    grossWeightKgs: 0,
-    netWeightKgs: 0,
-    category: "",
-  });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
