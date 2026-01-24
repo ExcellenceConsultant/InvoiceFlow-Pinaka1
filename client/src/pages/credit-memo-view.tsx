@@ -593,12 +593,12 @@ function CreditMemoView() {
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Credit Memos
+          Back to Returns
         </Button>
         <div className="flex gap-2">
           <Button onClick={handlePrint} data-testid="button-print">
             <Printer className="h-4 w-4 mr-2" />
-            Print Credit Memo
+            {(creditMemo as any).invoiceType === "payable" ? "Print Vendor Credit" : "Print Credit Memo"}
           </Button>
         </div>
       </div>
@@ -611,7 +611,9 @@ function CreditMemoView() {
           }`}
         >
           {/* Header */}
-          <div className="credit-memo-header">CREDIT MEMO</div>
+          <div className="credit-memo-header">
+            {(creditMemo as any).invoiceType === "payable" ? "VENDOR CREDIT" : "CREDIT MEMO"}
+          </div>
 
           {/* Info Grid */}
           <div className="credit-memo-info-grid">

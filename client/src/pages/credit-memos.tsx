@@ -1014,10 +1014,10 @@ export default function CreditMemos() {
               className="text-3xl font-bold text-foreground"
               data-testid="page-title"
             >
-              Credit Memos
+              Returns
             </h1>
             <p className="text-muted-foreground mt-1">
-              Manage and track all your credit memos
+              Manage credit memos and vendor credits
             </p>
           </div>
 
@@ -1067,7 +1067,7 @@ export default function CreditMemos() {
               data-testid="button-create-credit-memo"
             >
               <Plus className="mr-2" size={16} />
-              Create Credit Memo
+              {activeTab === "AR" ? "Create Credit Memo" : "Create Vendor Credit"}
             </Button>
           </div>
         </div>
@@ -1169,15 +1169,15 @@ export default function CreditMemos() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center">
                 <FileText className="mr-2 text-primary" size={20} />
-                {activeTab === "AR" ? "AR Credit Memos" : "AP Credit Memos"} (
+                {activeTab === "AR" ? "Credit Memos" : "Vendor Credits"} (
                 {filteredCreditMemos.length})
               </CardTitle>
               <TabsList data-testid="tabs-list">
                 <TabsTrigger value="AR" data-testid="tab-ar-credit-memos">
-                  AR Credit Memos
+                  Credit Memos
                 </TabsTrigger>
                 <TabsTrigger value="AP" data-testid="tab-ap-credit-memos">
-                  AP Credit Memos
+                  Vendor Credits
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -1520,7 +1520,7 @@ export default function CreditMemos() {
                   data-testid="button-create-first-credit-memo"
                 >
                   <Plus className="mr-2" size={16} />
-                  Create Credit Memo
+                  {activeTab === "AR" ? "Create Credit Memo" : "Create Vendor Credit"}
                 </Button>
               </div>
             )}

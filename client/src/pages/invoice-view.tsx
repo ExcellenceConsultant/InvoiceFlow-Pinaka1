@@ -632,7 +632,7 @@ function InvoiceView() {
           </Button>
           <Button onClick={handlePrint} data-testid="button-print">
             <Printer className="h-4 w-4 mr-2" />
-            Print Invoice
+            {(invoice as any).invoiceType === "payable" ? "Print Bill" : "Print Invoice"}
           </Button>
         </div>
       </div>
@@ -645,7 +645,9 @@ function InvoiceView() {
           }`}
         >
           {/* Header */}
-          <div className="invoice-header">INVOICE</div>
+          <div className="invoice-header">
+            {(invoice as any).invoiceType === "payable" ? "BILL" : "INVOICE"}
+          </div>
 
           {/* Info Grid */}
           <div className="invoice-info-grid">

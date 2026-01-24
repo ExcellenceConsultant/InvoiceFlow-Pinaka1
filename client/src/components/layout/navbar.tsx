@@ -59,9 +59,9 @@ export default function Navbar() {
                 <Button
                   variant={location === "/credit-memos" ? "default" : "ghost"}
                   size="sm"
-                  data-testid="link-credit-memos"
+                  data-testid="link-returns"
                 >
-                  Credit Memos
+                  Returns
                 </Button>
               </Link>
               <Link href="/accounts">
