@@ -5021,7 +5021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tax Agencies
   app.get("/api/tax/agencies", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const agencies = await storage.getTaxAgencies(userId);
       res.json(agencies);
@@ -5044,7 +5044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tax/agencies", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const parsed = insertTaxAgencySchema.parse(req.body);
       const agency = await storage.createTaxAgency({ ...parsed, userId });
@@ -5080,7 +5080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tax Rates
   app.get("/api/tax/rates", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const rates = await storage.getTaxRates(userId);
       res.json(rates);
@@ -5103,7 +5103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tax/rates", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const parsed = insertTaxRateSchema.parse(req.body);
       const rate = await storage.createTaxRate({ ...parsed, userId });
@@ -5139,7 +5139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tax Codes
   app.get("/api/tax/codes", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const codes = await storage.getTaxCodes(userId);
       res.json(codes);
@@ -5172,7 +5172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tax/codes", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const { taxRateIds, ...codeData } = req.body;
       const parsed = insertTaxCodeSchema.parse(codeData);
@@ -5236,7 +5236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Product Tax Codes
   app.get("/api/tax/product-tax-codes", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const mappings = await storage.getProductTaxCodes(userId);
       res.json(mappings);
@@ -5258,7 +5258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tax/product-tax-codes", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const parsed = insertProductTaxCodeSchema.parse(req.body);
       const mapping = await storage.createProductTaxCode({ ...parsed, userId });
@@ -5296,7 +5296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer Tax Settings
   app.get("/api/tax/customer-settings", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const settings = await storage.getCustomerTaxSettingsList(userId);
       res.json(settings);
@@ -5318,7 +5318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tax/customer-settings", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const parsed = insertCustomerTaxSettingsSchema.parse(req.body);
       const settings = await storage.createCustomerTaxSettings({ ...parsed, userId });
@@ -5354,7 +5354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tax Calculation Endpoints
   app.post("/api/tax/calculate", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       const { productId, customerId, invoiceDate, taxableAmount, state } = req.body;
@@ -5383,7 +5383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tax/calculate-batch", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       const { customerId, invoiceDate, state, lineItems } = req.body;
@@ -5414,7 +5414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tax/validate-for-sync/:invoiceId", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       const result = await validateTaxConfigForSync(req.params.invoiceId, userId);
@@ -5438,7 +5438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tax/recalculate-invoice/:invoiceId", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.userId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       const invoice = await storage.getInvoice(req.params.invoiceId);
