@@ -508,8 +508,9 @@ export const taxAgencies = pgTable("tax_agencies", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   qbTaxAgencyId: text("qb_tax_agency_id"), // QuickBooks TaxAgency ID for sync
-  agencyName: text("agency_name").notNull(),
-  jurisdictionType: text("jurisdiction_type").notNull().default("STATE"), // STATE, COUNTY, CITY
+  name: text("name").notNull(), // Agency display name
+  jurisdiction: text("jurisdiction"), // Jurisdiction name (e.g., "New Jersey", "Los Angeles County")
+  jurisdictionType: text("jurisdiction_type").notNull().default("state"), // state, county, city, district
   status: text("status").notNull().default("active"), // active, inactive
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
