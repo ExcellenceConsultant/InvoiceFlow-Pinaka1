@@ -23,7 +23,7 @@ export default function Navbar() {
               className="flex items-center mr-8 flex-shrink-0 gap-2"
               data-testid="link-home"
             >
-              <img src={pinakaLogo} alt="Pinaka Foods Inc" className="h-8 w-8 object-contain" />
+              <img src={pinakaLogo} alt="Pinaka Foods Inc" className="h-12 w-12 object-contain" />
               <span className="text-xl font-bold text-foreground whitespace-nowrap">
                 InvoiceFlow
               </span>

@@ -63,7 +63,7 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4">
           <div className="flex items-center justify-center gap-3">
-            <img src={pinakaLogo} alt="Pinaka Foods Inc" className="h-10 w-10 object-contain" />
+            <img src={pinakaLogo} alt="Pinaka Foods Inc" className="h-14 w-14 object-contain" />
             <span className="text-2xl font-bold">InvoiceFlow</span>
           </div>
           <div>
