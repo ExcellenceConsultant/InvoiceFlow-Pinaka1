@@ -4205,7 +4205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const rule = await storage.createCustomerPriceRule({
           customerId,
           marginPercent: marginPercent?.toString(),
-          effectiveFromDate: effectiveFromDate,
+          effectiveFromDate: effectiveFromDate ? new Date(effectiveFromDate) : new Date(),
           status: status || "active",
           userId,
           createdBy: userId,
