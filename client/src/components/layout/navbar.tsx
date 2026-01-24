@@ -100,6 +100,15 @@ export default function Navbar() {
                   Price Rule
                 </Button>
               </Link>
+              <Link href="/sales-tax">
+                <Button
+                  variant={location === "/sales-tax" ? "default" : "ghost"}
+                  size="sm"
+                  data-testid="link-sales-tax"
+                >
+                  Sales Tax
+                </Button>
+              </Link>
               <Link href="/quickbooks/sync">
                 <Button
                   variant={

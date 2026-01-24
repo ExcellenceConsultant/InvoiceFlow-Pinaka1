@@ -23,6 +23,7 @@ import QuickBooksCallback from "@/pages/quickbooks-callback";
 import QuickBooksSync from "@/pages/quickbooks-sync";
 import UserManagement from "@/pages/user-management";
 import PriceRules from "@/pages/price-rules";
+import SalesTax from "@/pages/sales-tax";
 import Navbar from "@/components/layout/navbar";
 import NotFound from "@/pages/not-found";
 
@@ -107,6 +108,9 @@ function Router() {
         </Route>
         <Route path="/price-rules">
           <ProtectedRoute component={PriceRules} />
+        </Route>
+        <Route path="/sales-tax">
+          <ProtectedRoute component={SalesTax} />
         </Route>
         <Route path="/quickbooks/sync">
           <ProtectedRoute component={QuickBooksSync} />
