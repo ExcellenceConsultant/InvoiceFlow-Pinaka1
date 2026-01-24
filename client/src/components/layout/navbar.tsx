@@ -91,6 +91,15 @@ export default function Navbar() {
                   Schemes
                 </Button>
               </Link>
+              <Link href="/price-rules">
+                <Button
+                  variant={location === "/price-rules" ? "default" : "ghost"}
+                  size="sm"
+                  data-testid="link-price-rules"
+                >
+                  Price Rule
+                </Button>
+              </Link>
               <Link href="/quickbooks/sync">
                 <Button
                   variant={

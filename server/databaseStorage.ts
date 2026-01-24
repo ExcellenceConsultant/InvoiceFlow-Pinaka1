@@ -12,6 +12,10 @@ import {
   productVariants,
   systemSettings,
   users,
+  globalPriceRule,
+  productPriceRule,
+  customerPriceRule,
+  customerProductPriceRule,
   type CreditMemo,
   type CreditMemoLineItem,
   type Customer,
@@ -36,6 +40,14 @@ import {
   type ProductScheme,
   type ProductVariant,
   type User,
+  type GlobalPriceRule,
+  type InsertGlobalPriceRule,
+  type ProductPriceRule,
+  type InsertProductPriceRule,
+  type CustomerPriceRule,
+  type InsertCustomerPriceRule,
+  type CustomerProductPriceRule,
+  type InsertCustomerProductPriceRule,
 } from "@shared/schema";
 import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -812,6 +824,224 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(customerProductMargins)
       .where(eq(customerProductMargins.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ============================================
+  // PRICE RULE IMPLEMENTATIONS
+  // ============================================
+
+  // Global Price Rule
+  async getGlobalPriceRule(userId: string): Promise<GlobalPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .select()
+      .from(globalPriceRule)
+      .where(eq(globalPriceRule.userId, userId))
+      .limit(1);
+    return rule;
+  }
+
+  async createGlobalPriceRule(ruleData: InsertGlobalPriceRule & { userId: string }): Promise<GlobalPriceRule> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .insert(globalPriceRule)
+      .values(ruleData)
+      .returning();
+    return rule;
+  }
+
+  async updateGlobalPriceRule(id: string, updates: Partial<GlobalPriceRule>): Promise<GlobalPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .update(globalPriceRule)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(globalPriceRule.id, id))
+      .returning();
+    return rule;
+  }
+
+  // Product Price Rule
+  async getProductPriceRules(userId: string): Promise<ProductPriceRule[]> {
+    await this.ensureInitialized();
+    return db
+      .select()
+      .from(productPriceRule)
+      .where(eq(productPriceRule.userId, userId));
+  }
+
+  async getProductPriceRule(id: string): Promise<ProductPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .select()
+      .from(productPriceRule)
+      .where(eq(productPriceRule.id, id))
+      .limit(1);
+    return rule;
+  }
+
+  async getProductPriceRuleByProduct(productId: string): Promise<ProductPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .select()
+      .from(productPriceRule)
+      .where(
+        and(
+          eq(productPriceRule.productId, productId),
+          eq(productPriceRule.status, "active")
+        )
+      )
+      .limit(1);
+    return rule;
+  }
+
+  async createProductPriceRule(ruleData: InsertProductPriceRule & { userId: string }): Promise<ProductPriceRule> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .insert(productPriceRule)
+      .values(ruleData)
+      .returning();
+    return rule;
+  }
+
+  async updateProductPriceRule(id: string, updates: Partial<ProductPriceRule>): Promise<ProductPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .update(productPriceRule)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(productPriceRule.id, id))
+      .returning();
+    return rule;
+  }
+
+  async deleteProductPriceRule(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db
+      .delete(productPriceRule)
+      .where(eq(productPriceRule.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Customer Price Rule
+  async getCustomerPriceRules(userId: string): Promise<CustomerPriceRule[]> {
+    await this.ensureInitialized();
+    return db
+      .select()
+      .from(customerPriceRule)
+      .where(eq(customerPriceRule.userId, userId));
+  }
+
+  async getCustomerPriceRule(id: string): Promise<CustomerPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .select()
+      .from(customerPriceRule)
+      .where(eq(customerPriceRule.id, id))
+      .limit(1);
+    return rule;
+  }
+
+  async getCustomerPriceRuleByCustomer(customerId: string): Promise<CustomerPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .select()
+      .from(customerPriceRule)
+      .where(
+        and(
+          eq(customerPriceRule.customerId, customerId),
+          eq(customerPriceRule.status, "active")
+        )
+      )
+      .limit(1);
+    return rule;
+  }
+
+  async createCustomerPriceRule(ruleData: InsertCustomerPriceRule & { userId: string }): Promise<CustomerPriceRule> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .insert(customerPriceRule)
+      .values(ruleData)
+      .returning();
+    return rule;
+  }
+
+  async updateCustomerPriceRule(id: string, updates: Partial<CustomerPriceRule>): Promise<CustomerPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .update(customerPriceRule)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(customerPriceRule.id, id))
+      .returning();
+    return rule;
+  }
+
+  async deleteCustomerPriceRule(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db
+      .delete(customerPriceRule)
+      .where(eq(customerPriceRule.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Customer Product Price Rule
+  async getCustomerProductPriceRules(userId: string): Promise<CustomerProductPriceRule[]> {
+    await this.ensureInitialized();
+    return db
+      .select()
+      .from(customerProductPriceRule)
+      .where(eq(customerProductPriceRule.userId, userId));
+  }
+
+  async getCustomerProductPriceRule(id: string): Promise<CustomerProductPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .select()
+      .from(customerProductPriceRule)
+      .where(eq(customerProductPriceRule.id, id))
+      .limit(1);
+    return rule;
+  }
+
+  async getCustomerProductPriceRuleByPair(customerId: string, productId: string): Promise<CustomerProductPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .select()
+      .from(customerProductPriceRule)
+      .where(
+        and(
+          eq(customerProductPriceRule.customerId, customerId),
+          eq(customerProductPriceRule.productId, productId),
+          eq(customerProductPriceRule.status, "active")
+        )
+      )
+      .limit(1);
+    return rule;
+  }
+
+  async createCustomerProductPriceRule(ruleData: InsertCustomerProductPriceRule & { userId: string }): Promise<CustomerProductPriceRule> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .insert(customerProductPriceRule)
+      .values(ruleData)
+      .returning();
+    return rule;
+  }
+
+  async updateCustomerProductPriceRule(id: string, updates: Partial<CustomerProductPriceRule>): Promise<CustomerProductPriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .update(customerProductPriceRule)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(customerProductPriceRule.id, id))
+      .returning();
+    return rule;
+  }
+
+  async deleteCustomerProductPriceRule(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db
+      .delete(customerProductPriceRule)
+      .where(eq(customerProductPriceRule.id, id));
     return (result.rowCount || 0) > 0;
   }
 }

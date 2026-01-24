@@ -22,7 +22,11 @@ import {
   customers, 
   products, 
   customerProductMargins,
-  systemSettings 
+  systemSettings,
+  globalPriceRule,
+  productPriceRule,
+  customerPriceRule,
+  customerProductPriceRule
 } from "@shared/schema";
 import { eq, and, lte, desc, sql } from "drizzle-orm";
 
@@ -88,25 +92,49 @@ async function getLatestPurchasePrice(
 }
 
 /**
- * Get the margin percentage using priority rules
+ * Get the margin percentage using priority rules from Price Rule tables
  * 
  * Priority order (first match wins, margins not combined):
- * 1. Customer + Product specific margin
- * 2. Customer default margin
- * 3. Product default margin (marginPerCarton)
- * 4. Global default margin
+ * 1. Customer + Product Price Rule (active, effective_from_date <= documentDate)
+ * 2. Customer Price Rule (active, effective_from_date <= documentDate)
+ * 3. Product Price Rule (active)
+ * 4. Global Price Rule (enabled)
  * 
  * @param customerId - The customer ID
  * @param productId - The product ID
+ * @param documentDate - The document date for effective date filtering
  * @returns Margin info with percentage and source
  */
 async function getMarginPercent(
   customerId: string,
-  productId: string
+  productId: string,
+  documentDate: Date = new Date()
 ): Promise<{ margin: number; source: PriceCalculationResult['marginSource'] }> {
   
-  // Priority 1: Customer + Product specific margin
-  const customerProductMargin = await db
+  // Priority 1: Customer + Product Price Rule (active, effective date check)
+  const customerProductRule = await db
+    .select({ marginPercent: customerProductPriceRule.marginPercent })
+    .from(customerProductPriceRule)
+    .where(
+      and(
+        eq(customerProductPriceRule.customerId, customerId),
+        eq(customerProductPriceRule.productId, productId),
+        eq(customerProductPriceRule.status, "active"),
+        lte(customerProductPriceRule.effectiveFromDate, documentDate)
+      )
+    )
+    .orderBy(desc(customerProductPriceRule.effectiveFromDate))
+    .limit(1);
+
+  if (customerProductRule.length > 0 && customerProductRule[0].marginPercent !== null) {
+    return {
+      margin: parseFloat(customerProductRule[0].marginPercent),
+      source: 'customer_product',
+    };
+  }
+
+  // Fallback: Check legacy customerProductMargins table for backwards compatibility
+  const legacyMargin = await db
     .select({ marginPercent: customerProductMargins.marginPercent })
     .from(customerProductMargins)
     .where(
@@ -117,14 +145,35 @@ async function getMarginPercent(
     )
     .limit(1);
 
-  if (customerProductMargin.length > 0 && customerProductMargin[0].marginPercent !== null) {
+  if (legacyMargin.length > 0 && legacyMargin[0].marginPercent !== null) {
     return {
-      margin: parseFloat(customerProductMargin[0].marginPercent),
+      margin: parseFloat(legacyMargin[0].marginPercent),
       source: 'customer_product',
     };
   }
 
-  // Priority 2: Customer default margin
+  // Priority 2: Customer Price Rule (active, effective date check)
+  const customerRule = await db
+    .select({ marginPercent: customerPriceRule.marginPercent })
+    .from(customerPriceRule)
+    .where(
+      and(
+        eq(customerPriceRule.customerId, customerId),
+        eq(customerPriceRule.status, "active"),
+        lte(customerPriceRule.effectiveFromDate, documentDate)
+      )
+    )
+    .orderBy(desc(customerPriceRule.effectiveFromDate))
+    .limit(1);
+
+  if (customerRule.length > 0 && customerRule[0].marginPercent !== null) {
+    return {
+      margin: parseFloat(customerRule[0].marginPercent),
+      source: 'customer_default',
+    };
+  }
+
+  // Fallback: Check legacy customer default margin
   const customer = await db
     .select({ defaultMarginPercent: customers.defaultMarginPercent })
     .from(customers)
@@ -138,7 +187,26 @@ async function getMarginPercent(
     };
   }
 
-  // Priority 3: Product default margin
+  // Priority 3: Product Price Rule (active)
+  const productRule = await db
+    .select({ marginPercent: productPriceRule.marginPercent })
+    .from(productPriceRule)
+    .where(
+      and(
+        eq(productPriceRule.productId, productId),
+        eq(productPriceRule.status, "active")
+      )
+    )
+    .limit(1);
+
+  if (productRule.length > 0 && productRule[0].marginPercent !== null) {
+    return {
+      margin: parseFloat(productRule[0].marginPercent),
+      source: 'product_default',
+    };
+  }
+
+  // Fallback: Check legacy product margin
   const product = await db
     .select({ marginPerCarton: products.marginPerCarton })
     .from(products)
@@ -152,7 +220,25 @@ async function getMarginPercent(
     };
   }
 
-  // Priority 4: Global default margin
+  // Priority 4: Global Price Rule (enabled)
+  const globalRule = await db
+    .select({ 
+      enableAutoPriceRule: globalPriceRule.enableAutoPriceRule,
+      defaultMarginPercent: globalPriceRule.defaultMarginPercent 
+    })
+    .from(globalPriceRule)
+    .limit(1);
+
+  if (globalRule.length > 0 && 
+      globalRule[0].enableAutoPriceRule && 
+      globalRule[0].defaultMarginPercent !== null) {
+    return {
+      margin: parseFloat(globalRule[0].defaultMarginPercent),
+      source: 'global_default',
+    };
+  }
+
+  // Legacy fallback: Check system settings
   const globalSetting = await db
     .select({ value: systemSettings.value })
     .from(systemSettings)
@@ -200,8 +286,8 @@ export async function getSalesPrice(
   // Get latest purchase price on or before the document date
   const purchaseInfo = await getLatestPurchasePrice(productId, documentDate);
 
-  // Get the margin percentage using priority rules
-  const marginInfo = await getMarginPercent(customerId, productId);
+  // Get the margin percentage using priority rules (with effective date filtering)
+  const marginInfo = await getMarginPercent(customerId, productId, documentDate);
 
   // If no purchase price found, try to use product's base price as fallback
   if (!purchaseInfo) {

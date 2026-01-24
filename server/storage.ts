@@ -23,6 +23,14 @@ import {
   type InsertOrderLineItem,
   type CustomerProductMargin,
   type InsertCustomerProductMargin,
+  type GlobalPriceRule,
+  type InsertGlobalPriceRule,
+  type ProductPriceRule,
+  type InsertProductPriceRule,
+  type CustomerPriceRule,
+  type InsertCustomerPriceRule,
+  type CustomerProductPriceRule,
+  type InsertCustomerProductPriceRule,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -151,6 +159,35 @@ export interface IStorage {
   createCustomerProductMargin(margin: InsertCustomerProductMargin): Promise<CustomerProductMargin>;
   updateCustomerProductMargin(id: string, marginPercent: number): Promise<CustomerProductMargin | undefined>;
   deleteCustomerProductMargin(id: string): Promise<boolean>;
+
+  // Global Price Rule
+  getGlobalPriceRule(userId: string): Promise<GlobalPriceRule | undefined>;
+  createGlobalPriceRule(rule: InsertGlobalPriceRule & { userId: string }): Promise<GlobalPriceRule>;
+  updateGlobalPriceRule(id: string, updates: Partial<GlobalPriceRule>): Promise<GlobalPriceRule | undefined>;
+
+  // Product Price Rule
+  getProductPriceRules(userId: string): Promise<ProductPriceRule[]>;
+  getProductPriceRule(id: string): Promise<ProductPriceRule | undefined>;
+  getProductPriceRuleByProduct(productId: string): Promise<ProductPriceRule | undefined>;
+  createProductPriceRule(rule: InsertProductPriceRule & { userId: string }): Promise<ProductPriceRule>;
+  updateProductPriceRule(id: string, updates: Partial<ProductPriceRule>): Promise<ProductPriceRule | undefined>;
+  deleteProductPriceRule(id: string): Promise<boolean>;
+
+  // Customer Price Rule
+  getCustomerPriceRules(userId: string): Promise<CustomerPriceRule[]>;
+  getCustomerPriceRule(id: string): Promise<CustomerPriceRule | undefined>;
+  getCustomerPriceRuleByCustomer(customerId: string): Promise<CustomerPriceRule | undefined>;
+  createCustomerPriceRule(rule: InsertCustomerPriceRule & { userId: string }): Promise<CustomerPriceRule>;
+  updateCustomerPriceRule(id: string, updates: Partial<CustomerPriceRule>): Promise<CustomerPriceRule | undefined>;
+  deleteCustomerPriceRule(id: string): Promise<boolean>;
+
+  // Customer Product Price Rule
+  getCustomerProductPriceRules(userId: string): Promise<CustomerProductPriceRule[]>;
+  getCustomerProductPriceRule(id: string): Promise<CustomerProductPriceRule | undefined>;
+  getCustomerProductPriceRuleByPair(customerId: string, productId: string): Promise<CustomerProductPriceRule | undefined>;
+  createCustomerProductPriceRule(rule: InsertCustomerProductPriceRule & { userId: string }): Promise<CustomerProductPriceRule>;
+  updateCustomerProductPriceRule(id: string, updates: Partial<CustomerProductPriceRule>): Promise<CustomerProductPriceRule | undefined>;
+  deleteCustomerProductPriceRule(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -840,6 +877,71 @@ export class MemStorage implements IStorage {
   }
 
   async deleteCustomerProductMargin(_id: string): Promise<boolean> {
+    return false;
+  }
+
+  // Price Rule stub implementations (MemStorage)
+  async getGlobalPriceRule(_userId: string): Promise<GlobalPriceRule | undefined> {
+    return undefined;
+  }
+  async createGlobalPriceRule(_rule: InsertGlobalPriceRule & { userId: string }): Promise<GlobalPriceRule> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async updateGlobalPriceRule(_id: string, _updates: Partial<GlobalPriceRule>): Promise<GlobalPriceRule | undefined> {
+    return undefined;
+  }
+  async getProductPriceRules(_userId: string): Promise<ProductPriceRule[]> {
+    return [];
+  }
+  async getProductPriceRule(_id: string): Promise<ProductPriceRule | undefined> {
+    return undefined;
+  }
+  async getProductPriceRuleByProduct(_productId: string): Promise<ProductPriceRule | undefined> {
+    return undefined;
+  }
+  async createProductPriceRule(_rule: InsertProductPriceRule & { userId: string }): Promise<ProductPriceRule> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async updateProductPriceRule(_id: string, _updates: Partial<ProductPriceRule>): Promise<ProductPriceRule | undefined> {
+    return undefined;
+  }
+  async deleteProductPriceRule(_id: string): Promise<boolean> {
+    return false;
+  }
+  async getCustomerPriceRules(_userId: string): Promise<CustomerPriceRule[]> {
+    return [];
+  }
+  async getCustomerPriceRule(_id: string): Promise<CustomerPriceRule | undefined> {
+    return undefined;
+  }
+  async getCustomerPriceRuleByCustomer(_customerId: string): Promise<CustomerPriceRule | undefined> {
+    return undefined;
+  }
+  async createCustomerPriceRule(_rule: InsertCustomerPriceRule & { userId: string }): Promise<CustomerPriceRule> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async updateCustomerPriceRule(_id: string, _updates: Partial<CustomerPriceRule>): Promise<CustomerPriceRule | undefined> {
+    return undefined;
+  }
+  async deleteCustomerPriceRule(_id: string): Promise<boolean> {
+    return false;
+  }
+  async getCustomerProductPriceRules(_userId: string): Promise<CustomerProductPriceRule[]> {
+    return [];
+  }
+  async getCustomerProductPriceRule(_id: string): Promise<CustomerProductPriceRule | undefined> {
+    return undefined;
+  }
+  async getCustomerProductPriceRuleByPair(_customerId: string, _productId: string): Promise<CustomerProductPriceRule | undefined> {
+    return undefined;
+  }
+  async createCustomerProductPriceRule(_rule: InsertCustomerProductPriceRule & { userId: string }): Promise<CustomerProductPriceRule> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async updateCustomerProductPriceRule(_id: string, _updates: Partial<CustomerProductPriceRule>): Promise<CustomerProductPriceRule | undefined> {
+    return undefined;
+  }
+  async deleteCustomerProductPriceRule(_id: string): Promise<boolean> {
     return false;
   }
 }

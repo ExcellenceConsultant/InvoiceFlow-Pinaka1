@@ -3941,6 +3941,374 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // ============================================
+  // PRICE RULE MODULE (Admin / Authorized Users Only)
+  // ============================================
+
+  // Get Global Price Rule
+  app.get(
+    "/api/price-rules/global",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const rule = await storage.getGlobalPriceRule(userId);
+        res.json(rule || null);
+      } catch (error) {
+        console.error("Error fetching global price rule:", error);
+        res.status(500).json({ message: "Failed to fetch global price rule" });
+      }
+    }
+  );
+
+  // Create or Update Global Price Rule
+  app.post(
+    "/api/price-rules/global",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const { enableAutoPriceRule, defaultMarginPercent } = req.body;
+
+        const existingRule = await storage.getGlobalPriceRule(userId);
+        
+        if (existingRule) {
+          const updated = await storage.updateGlobalPriceRule(existingRule.id, {
+            enableAutoPriceRule,
+            defaultMarginPercent: defaultMarginPercent?.toString(),
+          });
+          res.json(updated);
+        } else {
+          const created = await storage.createGlobalPriceRule({
+            enableAutoPriceRule,
+            defaultMarginPercent: defaultMarginPercent?.toString(),
+            userId,
+            createdBy: userId,
+          });
+          res.status(201).json(created);
+        }
+      } catch (error) {
+        console.error("Error saving global price rule:", error);
+        res.status(500).json({ message: "Failed to save global price rule" });
+      }
+    }
+  );
+
+  // Get all Product Price Rules
+  app.get(
+    "/api/price-rules/products",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const rules = await storage.getProductPriceRules(userId);
+        
+        // Get products for display info
+        const products = await storage.getProducts(userId);
+        const productMap = new Map(products.map((p: any) => [p.id, p]));
+        
+        const rulesWithProducts = rules.map((rule: any) => ({
+          ...rule,
+          product: productMap.get(rule.productId),
+        }));
+        
+        res.json(rulesWithProducts);
+      } catch (error) {
+        console.error("Error fetching product price rules:", error);
+        res.status(500).json({ message: "Failed to fetch product price rules" });
+      }
+    }
+  );
+
+  // Create Product Price Rule
+  app.post(
+    "/api/price-rules/products",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const { productId, marginPercent, status } = req.body;
+
+        // Check if rule already exists for this product
+        const existing = await storage.getProductPriceRuleByProduct(productId);
+        if (existing) {
+          return res.status(400).json({ message: "A price rule already exists for this product" });
+        }
+
+        const rule = await storage.createProductPriceRule({
+          productId,
+          marginPercent: marginPercent?.toString(),
+          status: status || "active",
+          userId,
+          createdBy: userId,
+        });
+        res.status(201).json(rule);
+      } catch (error) {
+        console.error("Error creating product price rule:", error);
+        res.status(500).json({ message: "Failed to create product price rule" });
+      }
+    }
+  );
+
+  // Update Product Price Rule
+  app.patch(
+    "/api/price-rules/products/:id",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { marginPercent, status } = req.body;
+
+        const updates: any = {};
+        if (marginPercent !== undefined) updates.marginPercent = marginPercent?.toString();
+        if (status !== undefined) updates.status = status;
+
+        const rule = await storage.updateProductPriceRule(id, updates);
+        if (!rule) {
+          return res.status(404).json({ message: "Price rule not found" });
+        }
+        res.json(rule);
+      } catch (error) {
+        console.error("Error updating product price rule:", error);
+        res.status(500).json({ message: "Failed to update product price rule" });
+      }
+    }
+  );
+
+  // Delete Product Price Rule
+  app.delete(
+    "/api/price-rules/products/:id",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const success = await storage.deleteProductPriceRule(id);
+        if (!success) {
+          return res.status(404).json({ message: "Price rule not found" });
+        }
+        res.json({ message: "Price rule deleted" });
+      } catch (error) {
+        console.error("Error deleting product price rule:", error);
+        res.status(500).json({ message: "Failed to delete product price rule" });
+      }
+    }
+  );
+
+  // Get all Customer Price Rules
+  app.get(
+    "/api/price-rules/customers",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const rules = await storage.getCustomerPriceRules(userId);
+        
+        // Get customers for display info
+        const customers = await storage.getCustomers(userId);
+        const customerMap = new Map(customers.map((c: any) => [c.id, c]));
+        
+        const rulesWithCustomers = rules.map((rule: any) => ({
+          ...rule,
+          customer: customerMap.get(rule.customerId),
+        }));
+        
+        res.json(rulesWithCustomers);
+      } catch (error) {
+        console.error("Error fetching customer price rules:", error);
+        res.status(500).json({ message: "Failed to fetch customer price rules" });
+      }
+    }
+  );
+
+  // Create Customer Price Rule
+  app.post(
+    "/api/price-rules/customers",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const { customerId, marginPercent, effectiveFromDate, status } = req.body;
+
+        const rule = await storage.createCustomerPriceRule({
+          customerId,
+          marginPercent: marginPercent?.toString(),
+          effectiveFromDate: effectiveFromDate,
+          status: status || "active",
+          userId,
+          createdBy: userId,
+        });
+        res.status(201).json(rule);
+      } catch (error) {
+        console.error("Error creating customer price rule:", error);
+        res.status(500).json({ message: "Failed to create customer price rule" });
+      }
+    }
+  );
+
+  // Update Customer Price Rule
+  app.patch(
+    "/api/price-rules/customers/:id",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { marginPercent, effectiveFromDate, status } = req.body;
+
+        const updates: any = {};
+        if (marginPercent !== undefined) updates.marginPercent = marginPercent?.toString();
+        if (effectiveFromDate !== undefined) updates.effectiveFromDate = new Date(effectiveFromDate);
+        if (status !== undefined) updates.status = status;
+
+        const rule = await storage.updateCustomerPriceRule(id, updates);
+        if (!rule) {
+          return res.status(404).json({ message: "Price rule not found" });
+        }
+        res.json(rule);
+      } catch (error) {
+        console.error("Error updating customer price rule:", error);
+        res.status(500).json({ message: "Failed to update customer price rule" });
+      }
+    }
+  );
+
+  // Delete Customer Price Rule
+  app.delete(
+    "/api/price-rules/customers/:id",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const success = await storage.deleteCustomerPriceRule(id);
+        if (!success) {
+          return res.status(404).json({ message: "Price rule not found" });
+        }
+        res.json({ message: "Price rule deleted" });
+      } catch (error) {
+        console.error("Error deleting customer price rule:", error);
+        res.status(500).json({ message: "Failed to delete customer price rule" });
+      }
+    }
+  );
+
+  // Get all Customer+Product Price Rules
+  app.get(
+    "/api/price-rules/customer-products",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const rules = await storage.getCustomerProductPriceRules(userId);
+        
+        // Get customers and products for display info
+        const customers = await storage.getCustomers(userId);
+        const products = await storage.getProducts(userId);
+        const customerMap = new Map(customers.map((c: any) => [c.id, c]));
+        const productMap = new Map(products.map((p: any) => [p.id, p]));
+        
+        const rulesWithInfo = rules.map((rule: any) => ({
+          ...rule,
+          customer: customerMap.get(rule.customerId),
+          product: productMap.get(rule.productId),
+        }));
+        
+        res.json(rulesWithInfo);
+      } catch (error) {
+        console.error("Error fetching customer+product price rules:", error);
+        res.status(500).json({ message: "Failed to fetch customer+product price rules" });
+      }
+    }
+  );
+
+  // Create Customer+Product Price Rule
+  app.post(
+    "/api/price-rules/customer-products",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const { customerId, productId, marginPercent, effectiveFromDate, status } = req.body;
+
+        // Check if rule already exists for this pair
+        const existing = await storage.getCustomerProductPriceRuleByPair(customerId, productId);
+        if (existing) {
+          return res.status(400).json({ message: "A price rule already exists for this customer and product combination" });
+        }
+
+        const rule = await storage.createCustomerProductPriceRule({
+          customerId,
+          productId,
+          marginPercent: marginPercent?.toString(),
+          effectiveFromDate: effectiveFromDate,
+          status: status || "active",
+          userId,
+          createdBy: userId,
+        });
+        res.status(201).json(rule);
+      } catch (error) {
+        console.error("Error creating customer+product price rule:", error);
+        res.status(500).json({ message: "Failed to create customer+product price rule" });
+      }
+    }
+  );
+
+  // Update Customer+Product Price Rule
+  app.patch(
+    "/api/price-rules/customer-products/:id",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { marginPercent, effectiveFromDate, status } = req.body;
+
+        const updates: any = {};
+        if (marginPercent !== undefined) updates.marginPercent = marginPercent?.toString();
+        if (effectiveFromDate !== undefined) updates.effectiveFromDate = new Date(effectiveFromDate);
+        if (status !== undefined) updates.status = status;
+
+        const rule = await storage.updateCustomerProductPriceRule(id, updates);
+        if (!rule) {
+          return res.status(404).json({ message: "Price rule not found" });
+        }
+        res.json(rule);
+      } catch (error) {
+        console.error("Error updating customer+product price rule:", error);
+        res.status(500).json({ message: "Failed to update customer+product price rule" });
+      }
+    }
+  );
+
+  // Delete Customer+Product Price Rule
+  app.delete(
+    "/api/price-rules/customer-products/:id",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const success = await storage.deleteCustomerProductPriceRule(id);
+        if (!success) {
+          return res.status(404).json({ message: "Price rule not found" });
+        }
+        res.json({ message: "Price rule deleted" });
+      } catch (error) {
+        console.error("Error deleting customer+product price rule:", error);
+        res.status(500).json({ message: "Failed to delete customer+product price rule" });
+      }
+    }
+  );
 
   // ============================================
   // INVENTORY MARGIN MANAGEMENT (Super Admin Only)

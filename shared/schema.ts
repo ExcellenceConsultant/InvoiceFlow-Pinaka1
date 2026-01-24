@@ -89,6 +89,71 @@ export const products = pgTable("products", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ============================================
+// PRICE RULE TABLES
+// ============================================
+
+// Global Price Rule - fallback margin when no other rule applies
+// Only one row should be active at a time
+export const globalPriceRule = pgTable("global_price_rule", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  enableAutoPriceRule: boolean("enable_auto_price_rule").default(true).notNull(),
+  defaultMarginPercent: decimal("default_margin_percent", { precision: 5, scale: 2 }).notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Product Price Rule - default margin per product (applies to all customers unless overridden)
+export const productPriceRule = pgTable("product_price_rule", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").references(() => products.id).notNull(),
+  marginPercent: decimal("margin_percent", { precision: 5, scale: 2 }).notNull(),
+  status: text("status").notNull().default("active"), // 'active' or 'inactive'
+  userId: varchar("user_id").references(() => users.id),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Customer Price Rule - default margin per customer for all products
+export const customerPriceRule = pgTable("customer_price_rule", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  marginPercent: decimal("margin_percent", { precision: 5, scale: 2 }).notNull(),
+  effectiveFromDate: timestamp("effective_from_date").notNull(),
+  status: text("status").notNull().default("active"), // 'active' or 'inactive'
+  userId: varchar("user_id").references(() => users.id),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Customer + Product Price Rule - highest-priority margin for specific customer and product
+// This replaces the simpler customerProductMargins table with full status/date tracking
+export const customerProductPriceRule = pgTable("customer_product_price_rule", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  productId: varchar("product_id").references(() => products.id).notNull(),
+  marginPercent: decimal("margin_percent", { precision: 5, scale: 2 }).notNull(),
+  effectiveFromDate: timestamp("effective_from_date").notNull(),
+  status: text("status").notNull().default("active"), // 'active' or 'inactive'
+  userId: varchar("user_id").references(() => users.id),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Legacy table - kept for backwards compatibility, will be deprecated
 // Customer-Product Margin table for specific margin rules per customer-product combination
 // Used in Advanced Price Rule feature to calculate sales prices
 export const customerProductMargins = pgTable("customer_product_margins", {
@@ -326,6 +391,39 @@ export const insertCustomerProductMarginSchema = createInsertSchema(
   updatedAt: true,
 });
 
+// Price Rule Schemas
+export const insertGlobalPriceRuleSchema = createInsertSchema(globalPriceRule).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProductPriceRuleSchema = createInsertSchema(productPriceRule).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCustomerPriceRuleSchema = createInsertSchema(customerPriceRule)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    effectiveFromDate: z.string().transform((str) => new Date(str)),
+  });
+
+export const insertCustomerProductPriceRuleSchema = createInsertSchema(customerProductPriceRule)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    effectiveFromDate: z.string().transform((str) => new Date(str)),
+  });
+
 export const insertProductSchemeSchema = createInsertSchema(
   productSchemes,
 ).omit({
@@ -409,6 +507,17 @@ export type ProductVariant = typeof productVariants.$inferSelect;
 export type InsertProductVariant = z.infer<typeof insertProductVariantSchema>;
 export type CustomerProductMargin = typeof customerProductMargins.$inferSelect;
 export type InsertCustomerProductMargin = z.infer<typeof insertCustomerProductMarginSchema>;
+
+// Price Rule Types
+export type GlobalPriceRule = typeof globalPriceRule.$inferSelect;
+export type InsertGlobalPriceRule = z.infer<typeof insertGlobalPriceRuleSchema>;
+export type ProductPriceRule = typeof productPriceRule.$inferSelect;
+export type InsertProductPriceRule = z.infer<typeof insertProductPriceRuleSchema>;
+export type CustomerPriceRule = typeof customerPriceRule.$inferSelect;
+export type InsertCustomerPriceRule = z.infer<typeof insertCustomerPriceRuleSchema>;
+export type CustomerProductPriceRule = typeof customerProductPriceRule.$inferSelect;
+export type InsertCustomerProductPriceRule = z.infer<typeof insertCustomerProductPriceRuleSchema>;
+
 export type ProductScheme = typeof productSchemes.$inferSelect;
 export type InsertProductScheme = z.infer<typeof insertProductSchemeSchema>;
 export type Invoice = typeof invoices.$inferSelect;

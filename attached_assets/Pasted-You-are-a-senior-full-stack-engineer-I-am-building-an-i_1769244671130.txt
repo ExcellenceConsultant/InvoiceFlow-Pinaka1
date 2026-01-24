@@ -1,0 +1,160 @@
+You are a senior full-stack engineer.
+
+I am building an invoicing software.
+Create a standalone module called **“Price Rule”**
+that manages margin-based pricing logic.
+
+This module must appear as a main menu item
+placed BEFORE the "QB Sync" module.
+
+================================
+MODULE LOCATION & ACCESS
+================================
+
+Main Menu:
+Price Rule
+
+Access:
+- Admin / Authorized users only
+
+================================
+PRICE RULE MODULE SECTIONS
+================================
+
+The Price Rule module must include the following sections (tabs or pages):
+
+--------------------------------
+1) GLOBAL PRICE RULE
+--------------------------------
+Purpose:
+Fallback margin when no other rule applies.
+
+Fields:
+- enable_auto_price_rule (boolean)
+- default_margin_percent (number)
+
+Rules:
+- Only one Global Price Rule can be active
+
+--------------------------------
+2) PRODUCT PRICE RULE
+--------------------------------
+Purpose:
+Default margin per product (applies to all customers unless overridden).
+
+Fields:
+- product_id
+- margin_percent
+- status (active / inactive)
+
+Display (read-only):
+- latest_purchase_price
+- auto_calculated_sales_price
+
+--------------------------------
+3) CUSTOMER PRICE RULE
+--------------------------------
+Purpose:
+Default margin per customer for all products.
+
+Fields:
+- customer_id
+- margin_percent
+- effective_from_date
+- status (active / inactive)
+
+--------------------------------
+4) CUSTOMER + PRODUCT PRICE RULE
+--------------------------------
+Purpose:
+Highest-priority margin for specific customer and product.
+
+Fields:
+- customer_id
+- product_id
+- margin_percent
+- effective_from_date
+- status (active / inactive)
+
+================================
+MARGIN PRIORITY LOGIC
+================================
+
+When calculating selling price, resolve margin in this exact order:
+
+1. Customer + Product Price Rule
+2. Customer Price Rule
+3. Product Price Rule
+4. Global Price Rule
+
+First valid rule wins.
+Margins must NOT be combined.
+
+================================
+PURCHASE PRICE LOGIC
+================================
+
+- Selling price must be based on the **latest purchase bill**
+- Latest purchase is determined by:
+  - Highest purchase_date
+  - If same date, latest created_at
+- Purchase price is effective from purchase date onward
+- Existing sales orders and invoices must NOT be recalculated
+
+================================
+PRICING FORMULA
+================================
+
+sales_price = latest_purchase_price × (1 + margin_percent / 100)
+
+================================
+FUNCTIONAL REQUIREMENTS
+================================
+
+1) Create a reusable pricing service:
+
+getSalesPrice(product_id, customer_id, document_date)
+
+2) The function must:
+- Fetch latest purchase price valid for document_date
+- Resolve margin using Price Rule priority
+- Return calculated selling price
+- Return pricing source (rule applied)
+
+3) Automatically apply pricing when product is added to:
+- Sales Order
+- Sales Invoice
+
+4) Allow manual price override without updating Price Rules
+
+5) Expose pricing source to UI:
+   Example:
+   "Price calculated using Customer Price Rule (20%)"
+
+================================
+DATABASE TABLES (REQUIRED)
+================================
+
+Global_Price_Rule
+Product_Price_Rule
+Customer_Price_Rule
+Customer_Product_Price_Rule
+Purchase
+
+Include:
+- created_at
+- updated_at
+- created_by
+
+================================
+OUTPUT EXPECTATION
+================================
+
+- Backend APIs/services for Price Rule module
+- Clean, reusable pricing logic
+- Integration hooks for Sales Order & Invoice
+- Inline comments explaining logic
+- Production-ready, scalable implementation
+
+DO NOT simplify the logic.
+DO NOT skip priority rules or date handling.

@@ -22,6 +22,7 @@ import QuickBooksAuth from "@/pages/quickbooks-auth";
 import QuickBooksCallback from "@/pages/quickbooks-callback";
 import QuickBooksSync from "@/pages/quickbooks-sync";
 import UserManagement from "@/pages/user-management";
+import PriceRules from "@/pages/price-rules";
 import Navbar from "@/components/layout/navbar";
 import NotFound from "@/pages/not-found";
 
@@ -103,6 +104,9 @@ function Router() {
         </Route>
         <Route path="/callback">
           <ProtectedRoute component={QuickBooksCallback} />
+        </Route>
+        <Route path="/price-rules">
+          <ProtectedRoute component={PriceRules} />
         </Route>
         <Route path="/quickbooks/sync">
           <ProtectedRoute component={QuickBooksSync} />
