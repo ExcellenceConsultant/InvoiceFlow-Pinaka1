@@ -4315,7 +4315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerId,
           productId,
           marginPercent: marginPercent?.toString(),
-          effectiveFromDate: effectiveFromDate,
+          effectiveFromDate: effectiveFromDate ? new Date(effectiveFromDate) : new Date(),
           status: status || "active",
           userId,
           createdBy: userId,
