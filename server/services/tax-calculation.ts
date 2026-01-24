@@ -25,7 +25,7 @@ import type {
 export interface TaxCalculationResult {
   qbTaxCodeId: string | null;
   taxCodeId: string;
-  taxCodeName: string;
+  taxCodeName: string; // Display name from the tax code
   isTaxable: boolean;
   appliedTaxRates: {
     taxRateId: string;
@@ -195,7 +195,7 @@ export async function getQuickBooksSalesTax(
     return {
       qbTaxCodeId: taxCode.qbTaxCodeId || null,
       taxCodeId: taxCode.id,
-      taxCodeName: taxCode.taxCodeName,
+      taxCodeName: taxCode.name,
       isTaxable: false,
       appliedTaxRates: [],
       taxPercentageTotal: "0.0000",
@@ -231,7 +231,7 @@ export async function getQuickBooksSalesTax(
   return {
     qbTaxCodeId: taxCode.qbTaxCodeId || null,
     taxCodeId: taxCode.id,
-    taxCodeName: taxCode.taxCodeName,
+    taxCodeName: taxCode.name,
     isTaxable: true,
     appliedTaxRates,
     taxPercentageTotal: totalTaxPercentage.toFixed(4),
@@ -307,7 +307,7 @@ export async function validateTaxConfigForSync(
   for (const detail of taxDetails) {
     const taxCode = await storage.getTaxCode(detail.taxCodeId);
     if (taxCode && !taxCode.qbTaxCodeId) {
-      errors.push(`Tax code "${taxCode.taxCodeName}" is not linked to QuickBooks. Please sync tax codes first.`);
+      errors.push(`Tax code "${taxCode.name}" is not linked to QuickBooks. Please sync tax codes first.`);
       break;
     }
   }

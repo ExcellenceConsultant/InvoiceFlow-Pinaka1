@@ -542,7 +542,8 @@ export const taxCodes = pgTable("tax_codes", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   qbTaxCodeId: text("qb_tax_code_id"), // QuickBooks TaxCode ID for sync
-  taxCodeName: text("tax_code_name").notNull(), // e.g., TAX, NON, CA_TAX
+  code: text("code").notNull(), // Short code like TAX, NON, CA_TAX
+  name: text("name").notNull(), // Display name
   description: text("description"),
   isTaxable: boolean("is_taxable").notNull().default(true),
   isDefault: boolean("is_default").default(false), // Company default tax code
