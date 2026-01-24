@@ -84,6 +84,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
   const isEditMode = !!invoice;
   const [lineItems, setLineItems] = useState([
     {
+      id: undefined as string | undefined,
       productId: "",
       variantId: "",
       description: "",
@@ -95,10 +96,11 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
       packingSize: "",
       grossWeightKgs: 0,
       netWeightKgs: 0,
-      category: "", // added category field to initial state
-      isSchemeDescription: false, // flag for scheme description line items
-      schemeDescription: "", // text for scheme description
-      stockQuantity: 0, // stock quantity for display
+      category: "",
+      isSchemeDescription: false,
+      schemeDescription: "",
+      stockQuantity: 0,
+      marginPerCarton: "",
     },
   ]);
   const [showSchemeItems, setShowSchemeItems] = useState<{
@@ -112,6 +114,10 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
   const [productSearchTerm, setProductSearchTerm] = useState<string>("");
   const [customerSearchTerm, setCustomerSearchTerm] = useState<string>("");
   const [invoiceNumberError, setInvoiceNumberError] = useState<string>("");
+  const [calculatedTax, setCalculatedTax] = useState<number>(
+    isEditMode ? parseFloat(invoice?.taxAmount || 0) : 0
+  );
+  const [isCalculatingTax, setIsCalculatingTax] = useState<boolean>(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -360,6 +366,61 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
     }
   }, [isEditMode, existingLineItems]);
 
+  // Watch form values for tax calculation
+  const watchedCustomerId = form.watch("customerId");
+  const watchedInvoiceDate = form.watch("invoiceDate");
+  const watchedInvoiceType = form.watch("invoiceType");
+  
+  // Calculate line items total for dependency tracking
+  const lineItemsTotal = lineItems.reduce((sum, item) => sum + item.lineTotal, 0);
+  const lineItemsProductIds = lineItems.map(item => item.productId).join(",");
+
+  // Calculate tax when customer or line items change (AR invoices only)
+  useEffect(() => {
+    const calculateTax = async () => {
+      // Only calculate tax for AR (receivable) invoices
+      if (watchedInvoiceType !== "receivable" || !watchedCustomerId || !watchedInvoiceDate) {
+        setCalculatedTax(isEditMode ? parseFloat(invoice?.taxAmount || 0) : 0);
+        return;
+      }
+
+      // Get valid line items with products
+      const validItems = lineItems.filter(item => item.productId && item.lineTotal > 0);
+      if (validItems.length === 0) {
+        setCalculatedTax(0);
+        return;
+      }
+
+      setIsCalculatingTax(true);
+      try {
+        const response = await apiRequest("POST", "/api/tax/calculate-batch", {
+          customerId: watchedCustomerId,
+          invoiceDate: watchedInvoiceDate,
+          lineItems: validItems.map(item => ({
+            productId: item.productId,
+            taxableAmount: item.lineTotal,
+          })),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          setCalculatedTax(parseFloat(result.totalTaxAmount) || 0);
+        } else {
+          setCalculatedTax(0);
+        }
+      } catch (error) {
+        console.error("Error calculating tax:", error);
+        setCalculatedTax(0);
+      } finally {
+        setIsCalculatingTax(false);
+      }
+    };
+
+    // Debounce tax calculation
+    const timeoutId = setTimeout(calculateTax, 500);
+    return () => clearTimeout(timeoutId);
+  }, [watchedCustomerId, watchedInvoiceDate, watchedInvoiceType, lineItemsTotal, lineItemsProductIds]);
+
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: any) => {
       console.log("Submitting invoice data:", data);
@@ -536,6 +597,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
     setLineItems([
       ...lineItems,
       {
+        id: undefined,
         productId: "",
         variantId: "",
         description: "",
@@ -547,13 +609,14 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
         packingSize: "",
         grossWeightKgs: 0,
         netWeightKgs: 0,
-        category: "", // keep category empty initially
+        category: "",
         isSchemeDescription: false,
         schemeDescription: "",
         stockQuantity: 0,
+        marginPerCarton: "",
       },
     ]);
-    setProductSearchTerm(""); // Clear search input when adding new item
+    setProductSearchTerm("");
   };
 
   const removeLineItem = (index: number) => {
@@ -628,7 +691,8 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
     const freight = data.freight || 0;
     const discountPercent = data.discount || 0;
     const discountAmount = (subtotal * discountPercent) / 100;
-    const total = subtotal + freight - discountAmount;
+    const taxAmount = data.invoiceType === "receivable" ? calculatedTax : 0;
+    const total = subtotal + freight - discountAmount + taxAmount;
 
     console.log("Current line items on submit:", lineItems);
 
@@ -750,6 +814,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
         subtotal: subtotal.toString(),
         freight: freight.toString(),
         discount: discountPercent.toString(),
+        taxAmount: taxAmount.toString(),
         total: total.toString(),
         status: isEditMode ? invoice.status : "draft",
         invoiceType: data.invoiceType,
@@ -1306,6 +1371,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                                     if (!isNextItemSchemeDesc) {
                                       // Insert scheme description line item after the product using array spread
                                       const schemeDescItem = {
+                                        id: undefined as string | undefined,
                                         productId: value,
                                         variantId: "",
                                         description: product.schemeDescription,
@@ -1322,6 +1388,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                                         schemeDescription:
                                           product.schemeDescription,
                                         stockQuantity: 0,
+                                        marginPerCarton: "",
                                       };
                                       // Create new array with scheme description inserted
                                       updatedItems = [
@@ -1940,6 +2007,20 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                         )}
                       </span>
                     </div>
+                    {form.watch("invoiceType") === "receivable" && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">
+                          Sales Tax:
+                          {isCalculatingTax && <span className="ml-1 text-xs">(calculating...)</span>}
+                        </span>
+                        <span
+                          className="font-medium"
+                          data-testid="invoice-tax-display"
+                        >
+                          {formatCurrency(calculatedTax)}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center pt-2 border-t">
                       <span className="text-lg font-semibold text-foreground">
                         Total Amount:
@@ -1952,7 +2033,8 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                           calculateTotal() +
                             (form.watch("freight") || 0) -
                             (calculateTotal() * (form.watch("discount") || 0)) /
-                              100,
+                              100 +
+                            (form.watch("invoiceType") === "receivable" ? calculatedTax : 0),
                         )}
                       </span>
                     </div>
