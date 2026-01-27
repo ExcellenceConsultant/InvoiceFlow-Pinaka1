@@ -23,7 +23,7 @@ import { formatCurrency } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Save, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -62,6 +62,7 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
     category: string;
   }>>([]);
   const [lineItemsLoaded, setLineItemsLoaded] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   const createEmptyLineItem = () => ({
     productId: "",
@@ -113,6 +114,22 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
   const activeCustomers = customers?.filter(
     (c: any) => c.isActive !== false && c.type === "customer"
   ) || [];
+
+  // Get unique categories from products
+  const categories = useMemo(() => {
+    if (!products) return [];
+    const cats = products
+      .map((p: any) => p.category)
+      .filter((c: string) => c && c.trim() !== "");
+    return Array.from(new Set(cats)).sort();
+  }, [products]);
+
+  // Filter products by selected category
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    if (categoryFilter === "all") return products;
+    return products.filter((p: any) => p.category === categoryFilter);
+  }, [products, categoryFilter]);
 
   useEffect(() => {
     if (!isEditMode && nextNumberData?.nextNumber) {
@@ -512,18 +529,33 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
               </div>
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <h3 className="text-lg font-semibold">Line Items</h3>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addLineItem}
-                    data-testid="button-add-line-item"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Item
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
+                        <SelectValue placeholder="Filter by category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {categories.map((category: string) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addLineItem}
+                      data-testid="button-add-line-item"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Item
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Table Header */}
@@ -552,9 +584,9 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
-                            {products?.map((product: any) => (
+                            {filteredProducts?.map((product: any) => (
                               <SelectItem key={product.id} value={product.id}>
-                                {product.name} ({product.cartoonBarcode || "No code"})
+                                {product.name} ({product.itemCode || "No code"})
                               </SelectItem>
                             ))}
                           </SelectContent>
