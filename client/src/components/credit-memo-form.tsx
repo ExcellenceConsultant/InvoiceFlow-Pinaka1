@@ -27,9 +27,9 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-const DEFAULT_NOTES = `1. All matters related to this credit memo or the goods shall be governed by the laws of Pennsylvania, and all disputes related here to shall be adjudicated exclusively in the state or federal courts located in  Pennsylvania.
-2. I understand and accept that cheque image deposited through ACH debits are valid mode of payment.
-3. Final Sale`;
+const DEFAULT_NOTES = `1. No return accepted of Frozen & Milk products Items-Its an Final Sale
+2. All returned checks are subject $50 surcharge
+3. All matters related to this invoice or the goods shall be governed by the State laws of New Jersey, and all disputes related here to shall be adjudicated exclusively in the state or federal courts located in New Jersey.`;
 
 const creditMemoSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
