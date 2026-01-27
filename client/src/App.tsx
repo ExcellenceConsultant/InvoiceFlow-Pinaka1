@@ -16,7 +16,6 @@ import ShippingLabel from "@/pages/shipping-label";
 import CreditMemos from "@/pages/credit-memos";
 import CreditMemoView from "@/pages/credit-memo-view";
 import Inventory from "@/pages/inventory";
-import Schemes from "@/pages/schemes";
 import Accounts from "@/pages/accounts";
 import QuickBooksAuth from "@/pages/quickbooks-auth";
 import QuickBooksCallback from "@/pages/quickbooks-callback";
@@ -93,9 +92,6 @@ function Router() {
         </Route>
         <Route path="/inventory">
           <ProtectedRoute component={Inventory} />
-        </Route>
-        <Route path="/schemes">
-          <ProtectedRoute component={Schemes} />
         </Route>
         <Route path="/accounts">
           <ProtectedRoute component={Accounts} />
