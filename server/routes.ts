@@ -3191,6 +3191,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Vendor sync to QuickBooks (for type="vendor" records)
+  app.post(
+    "/api/vendors/:id/sync-quickbooks",
+    isAuthenticated,
+    async (req, res) => {
+      try {
+        const vendor = await storage.getCustomer(req.params.id);
+        if (!vendor) {
+          return res.status(404).json({ message: "Vendor not found" });
+        }
+
+        if (vendor.type !== "vendor") {
+          return res.status(400).json({ message: "This record is not a vendor. Use customer sync instead." });
+        }
+
+        // Get system-wide QuickBooks config
+        const qbConfig = await storage.getSystemSetting("quickbooks_config");
+
+        if (!qbConfig) {
+          return res.status(400).json({
+            message: "QuickBooks is not connected. Please connect to QuickBooks first.",
+          });
+        }
+
+        // Check if access token needs refresh
+        const validQbConfig = await ensureValidTokens();
+
+        // Step 1: Try to find existing vendor in QuickBooks
+        let qbVendor;
+        const trimmedName = vendor.name.trim();
+
+        try {
+          qbVendor = await quickBooksService.findVendorByDisplayName(
+            validQbConfig.accessToken,
+            validQbConfig.companyId,
+            trimmedName,
+          );
+
+          if (qbVendor) {
+            console.log(`Found existing vendor in QuickBooks:`, {
+              Id: qbVendor.Id,
+              DisplayName: qbVendor.DisplayName,
+            });
+          }
+        } catch (lookupError: any) {
+          console.error(
+            "Vendor lookup failed:",
+            lookupError.response?.data || lookupError.message,
+          );
+          qbVendor = null;
+        }
+
+        // Step 2: If vendor doesn't exist, create it
+        if (!qbVendor) {
+          console.log(
+            `Vendor "${vendor.name}" not found in QuickBooks. Creating new vendor...`,
+          );
+
+          const qbVendorData = {
+            DisplayName: trimmedName,
+          };
+
+          try {
+            qbVendor = await quickBooksService.createVendor(
+              validQbConfig.accessToken,
+              validQbConfig.companyId,
+              qbVendorData,
+            );
+
+            console.log(`Successfully created new vendor in QuickBooks:`, {
+              Id: qbVendor.Id,
+              DisplayName: qbVendor.DisplayName,
+            });
+          } catch (createError: any) {
+            console.error(
+              "Vendor creation failed:",
+              createError.response?.data || createError.message,
+            );
+            
+            const errorDetail = createError.response?.data?.Fault?.Error?.[0]?.Detail || "";
+            
+            // If name already exists, try harder to find it
+            if (errorDetail.includes("already exists") || errorDetail.includes("Name supplied")) {
+              console.log("Name already exists in QB. Trying more aggressive search...");
+              
+              // Try to find by normalized match in vendors
+              try {
+                const allVendorsResp = await axios.get(
+                  `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=SELECT * FROM Vendor WHERE Active = true MAXRESULTS 1000`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${validQbConfig.accessToken}`,
+                      Accept: "application/json",
+                    },
+                  },
+                );
+                const allVendors = allVendorsResp.data.QueryResponse?.Vendor || [];
+                
+                // Search with trimmed and normalized comparison
+                const normalizedSearch = vendor.name.trim().toLowerCase();
+                const foundVendor = allVendors.find((v: any) => {
+                  const displayName = (v.DisplayName || "").trim().toLowerCase();
+                  const companyName = (v.CompanyName || "").trim().toLowerCase();
+                  return displayName === normalizedSearch || companyName === normalizedSearch;
+                });
+                
+                if (foundVendor) {
+                  console.log(`Found existing vendor on retry:`, foundVendor.Id, foundVendor.DisplayName);
+                  qbVendor = foundVendor;
+                } else {
+                  // Also check if it exists as a Customer (QB shares name namespace)
+                  const allCustomersResp = await axios.get(
+                    `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000`,
+                    {
+                      headers: {
+                        Authorization: `Bearer ${validQbConfig.accessToken}`,
+                        Accept: "application/json",
+                      },
+                    },
+                  );
+                  const allCustomers = allCustomersResp.data.QueryResponse?.Customer || [];
+                  
+                  const foundCustomer = allCustomers.find((c: any) => {
+                    const displayName = (c.DisplayName || "").trim().toLowerCase();
+                    const companyName = (c.CompanyName || "").trim().toLowerCase();
+                    return displayName === normalizedSearch || companyName === normalizedSearch;
+                  });
+                  
+                  if (foundCustomer) {
+                    console.log(`Name exists as Customer in QB:`, foundCustomer.Id, foundCustomer.DisplayName);
+                    return res.status(400).json({
+                      message: `This name already exists as a Customer in QuickBooks (${foundCustomer.DisplayName}). Please use a different name or sync as a customer.`,
+                      action: "name_conflict_customer",
+                    });
+                  }
+                }
+              } catch (searchErr) {
+                console.error("Aggressive search failed:", searchErr);
+              }
+              
+              if (!qbVendor) {
+                return res.status(500).json({
+                  message: `The name "${vendor.name}" already exists in QuickBooks but couldn't be found. Please check QuickBooks for a customer/vendor with a similar name.`,
+                  action: "name_exists",
+                });
+              }
+            } else {
+              const errorMessage =
+                createError.response?.data?.Fault?.Error?.[0]?.Detail ||
+                createError.response?.data?.Fault?.Error?.[0]?.code ||
+                "Failed to create vendor in QuickBooks";
+              return res
+                .status(500)
+                .json({ message: errorMessage, action: "create" });
+            }
+          }
+        }
+
+        // Step 3: Update local vendor record with QuickBooks ID
+        await storage.updateCustomer(vendor.id, {
+          quickbooksCustomerId: qbVendor.Id,
+        });
+
+        res.json({
+          success: true,
+          quickbooksCustomerId: qbVendor.Id,
+          action: qbVendor.DisplayName === vendor.name ? "found" : "created",
+          displayName: qbVendor.DisplayName,
+        });
+      } catch (error: unknown) {
+        const err = error as any;
+        console.error(
+          "QuickBooks vendor sync error:",
+          err.response?.data || err.message,
+        );
+        const errorMessage =
+          err.response?.data?.Fault?.Error?.[0]?.Detail ||
+          err.response?.data?.Fault?.Error?.[0]?.code ||
+          "Failed to sync vendor with QuickBooks";
+        res.status(500).json({ message: errorMessage });
+      }
+    },
+  );
+
   app.post(
     "/api/products/:id/sync-quickbooks",
     isAuthenticated,

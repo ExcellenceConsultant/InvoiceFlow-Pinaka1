@@ -45,25 +45,29 @@ export default function QuickBooksSync() {
   });
 
   const syncCustomerMutation = useMutation({
-    mutationFn: async (customerId: string) => {
-      const response = await apiRequest("POST", `/api/customers/${customerId}/sync-quickbooks`, {});
+    mutationFn: async ({ id, type }: { id: string; type: string }) => {
+      // Use appropriate endpoint based on type
+      const endpoint = type === "vendor" 
+        ? `/api/vendors/${id}/sync-quickbooks`
+        : `/api/customers/${id}/sync-quickbooks`;
+      const response = await apiRequest("POST", endpoint, {});
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to sync customer");
+        throw new Error(errorData.message || `Failed to sync ${type}`);
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
       toast({
         title: "Success",
-        description: "Customer synced to QuickBooks successfully!",
+        description: `${variables.type === "vendor" ? "Vendor" : "Customer"} synced to QuickBooks successfully!`,
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to sync customer to QuickBooks",
+        description: error.message || "Failed to sync to QuickBooks",
         variant: "destructive",
       });
     },
@@ -95,7 +99,12 @@ export default function QuickBooksSync() {
   });
 
   const isConnected = !!(user as any)?.quickbooksCompanyId;
-  const syncedCustomers = (customers as any[])?.filter((c: any) => c.quickbooksCustomerId) || [];
+  
+  // Separate customers and vendors
+  const customersOnly = (customers as any[])?.filter((c: any) => c.type === "customer" || !c.type) || [];
+  const vendorsOnly = (customers as any[])?.filter((c: any) => c.type === "vendor") || [];
+  const syncedCustomers = customersOnly.filter((c: any) => c.quickbooksCustomerId);
+  const syncedVendors = vendorsOnly.filter((v: any) => v.quickbooksCustomerId);
   const syncedProducts = (products as any[])?.filter((p: any) => p.quickbooksItemId) || [];
   const syncedInvoices = (invoices as any[])?.filter((i: any) => i.quickbooksInvoiceId) || [];
   
@@ -133,10 +142,13 @@ export default function QuickBooksSync() {
       const failedCustomers: any[] = [];
       const failedProducts: any[] = [];
 
-      // Sync all customers
+      // Sync all customers/vendors using appropriate endpoint based on type
       const customerPromises = unsyncedCustomers.map(async (customer: any) => {
         try {
-          const response = await apiRequest("POST", `/api/customers/${customer.id}/sync-quickbooks`, {});
+          const endpoint = customer.type === "vendor"
+            ? `/api/vendors/${customer.id}/sync-quickbooks`
+            : `/api/customers/${customer.id}/sync-quickbooks`;
+          const response = await apiRequest("POST", endpoint, {});
           if (!response.ok) {
             throw new Error("Failed to sync");
           }
@@ -314,15 +326,27 @@ export default function QuickBooksSync() {
       )}
 
       {/* Sync Status Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Customers Synced</p>
-                <p className="text-2xl font-bold">{syncedCustomers.length}/{(customers as any[])?.length || 0}</p>
+                <p className="text-2xl font-bold">{syncedCustomers.length}/{customersOnly.length}</p>
               </div>
               <Users className="h-8 w-8 text-primary" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Vendors Synced</p>
+                <p className="text-2xl font-bold">{syncedVendors.length}/{vendorsOnly.length}</p>
+              </div>
+              <Users className="h-8 w-8 text-orange-500" />
             </div>
           </CardContent>
         </Card>
@@ -368,36 +392,78 @@ export default function QuickBooksSync() {
               Before creating invoices in QuickBooks, you must sync all customers first.
             </p>
             <div className="space-y-2">
-              {(customers as any[])?.map((customer: any) => (
-                <div key={customer.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    {customer.quickbooksCustomerId ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <AlertCircle className="h-5 w-5 text-yellow-500" />
-                    )}
-                    <div>
-                      <p className="font-medium">{customer.name}</p>
-                      <p className="text-sm text-muted-foreground">{customer.email}</p>
+              {/* Customers Section */}
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-muted-foreground mb-2">Customers</h4>
+                {(customers as any[])?.filter((c: any) => c.type === "customer" || !c.type).map((customer: any) => (
+                  <div key={customer.id} className="flex items-center justify-between p-3 border rounded-lg mb-2">
+                    <div className="flex items-center gap-3">
+                      {customer.quickbooksCustomerId ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-yellow-500" />
+                      )}
+                      <div>
+                        <p className="font-medium">{customer.name}</p>
+                        <p className="text-sm text-muted-foreground">{customer.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {customer.quickbooksCustomerId ? (
+                        <Badge className="bg-green-500">Synced</Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => syncCustomerMutation.mutate({ id: customer.id, type: "customer" })}
+                          disabled={syncCustomerMutation.isPending || !canEditSync}
+                          data-testid={`button-sync-customer-${customer.id}`}
+                        >
+                          <Upload className="h-4 w-4 mr-1" />
+                          Sync
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {customer.quickbooksCustomerId ? (
-                      <Badge className="bg-green-500">Synced</Badge>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={() => syncCustomerMutation.mutate(customer.id)}
-                        disabled={syncCustomerMutation.isPending || !canEditSync}
-                        data-testid={`button-sync-customer-${customer.id}`}
-                      >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Sync
-                      </Button>
-                    )}
+                ))}
+              </div>
+              
+              {/* Vendors Section */}
+              <div>
+                <h4 className="text-sm font-semibold text-muted-foreground mb-2">Vendors</h4>
+                {(customers as any[])?.filter((c: any) => c.type === "vendor").map((vendor: any) => (
+                  <div key={vendor.id} className="flex items-center justify-between p-3 border rounded-lg mb-2">
+                    <div className="flex items-center gap-3">
+                      {vendor.quickbooksCustomerId ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-yellow-500" />
+                      )}
+                      <div>
+                        <p className="font-medium">{vendor.name}</p>
+                        <p className="text-sm text-muted-foreground">{vendor.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {vendor.quickbooksCustomerId ? (
+                        <Badge className="bg-green-500">Synced</Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => syncCustomerMutation.mutate({ id: vendor.id, type: "vendor" })}
+                          disabled={syncCustomerMutation.isPending || !canEditSync}
+                          data-testid={`button-sync-vendor-${vendor.id}`}
+                        >
+                          <Upload className="h-4 w-4 mr-1" />
+                          Sync
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+                {(customers as any[])?.filter((c: any) => c.type === "vendor").length === 0 && (
+                  <p className="text-sm text-muted-foreground italic">No vendors found</p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
