@@ -550,6 +550,13 @@ function TaxRatesTab() {
   );
 }
 
+interface QBTaxCode {
+  Id: string;
+  Name: string;
+  Taxable: boolean;
+  Description?: string;
+}
+
 function TaxCodesTab() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -571,6 +578,11 @@ function TaxCodesTab() {
 
   const { data: allRates = [] } = useQuery<TaxRate[]>({
     queryKey: ["/api/tax/rates"],
+  });
+
+  const { data: qbTaxCodes = [], isLoading: loadingQbCodes, refetch: refetchQbCodes } = useQuery<QBTaxCode[]>({
+    queryKey: ["/api/tax/quickbooks-tax-codes"],
+    enabled: false,
   });
 
   const createMutation = useMutation({
@@ -762,13 +774,40 @@ function TaxCodesTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label>QuickBooks Tax Code ID</Label>
-              <Input
-                value={formData.qbTaxCodeId}
-                onChange={(e) => setFormData({ ...formData, qbTaxCodeId: e.target.value })}
-                placeholder="e.g., TAX or NON (from QuickBooks)"
-                data-testid="input-qb-tax-code-id"
-              />
+              <Label>QuickBooks Tax Code</Label>
+              <div className="flex gap-2">
+                <Select 
+                  value={formData.qbTaxCodeId} 
+                  onValueChange={(v) => setFormData({ ...formData, qbTaxCodeId: v })}
+                >
+                  <SelectTrigger className="flex-1" data-testid="select-qb-tax-code">
+                    <SelectValue placeholder="Select QB Tax Code" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {qbTaxCodes.map((qbCode) => (
+                      <SelectItem key={qbCode.Id} value={qbCode.Id}>
+                        {qbCode.Name} ({qbCode.Taxable ? "Taxable" : "Non-Taxable"})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => refetchQbCodes()}
+                  disabled={loadingQbCodes}
+                  data-testid="button-fetch-qb-codes"
+                >
+                  {loadingQbCodes ? "Loading..." : "Fetch from QB"}
+                </Button>
+              </div>
+              {qbTaxCodes.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Click "Fetch from QB" to load tax codes from QuickBooks
+                </p>
+              )}
             </div>
             <div className="flex items-center justify-between">
               <Label>Taxable</Label>

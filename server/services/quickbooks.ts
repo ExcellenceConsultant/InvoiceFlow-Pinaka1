@@ -724,6 +724,44 @@ export class QuickBooksService {
     }
   }
 
+  /**
+   * Fetch all tax codes from QuickBooks
+   * Returns list of QB tax codes for linking to local tax codes
+   */
+  async getTaxCodes(
+    accessToken: string,
+    companyId: string,
+  ): Promise<Array<{ Id: string; Name: string; Taxable: boolean; Description?: string }>> {
+    try {
+      console.log("Fetching tax codes from QuickBooks...");
+      
+      const response = await axios.get(
+        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=SELECT * FROM TaxCode`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: "application/json",
+          },
+        },
+      );
+
+      const taxCodes = response.data.QueryResponse?.TaxCode || [];
+      console.log(`Found ${taxCodes.length} tax codes in QuickBooks:`, 
+        taxCodes.map((tc: any) => ({ Id: tc.Id, Name: tc.Name, Taxable: tc.Taxable }))
+      );
+      
+      return taxCodes.map((tc: any) => ({
+        Id: tc.Id,
+        Name: tc.Name,
+        Taxable: tc.Taxable ?? true,
+        Description: tc.Description,
+      }));
+    } catch (error: any) {
+      console.error("QuickBooks tax code fetch failed:", error.response?.data || error.message);
+      return [];
+    }
+  }
+
   async createItem(
     accessToken: string,
     companyId: string,

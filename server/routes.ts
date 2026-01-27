@@ -5233,6 +5233,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fetch tax codes from QuickBooks for linking
+  app.get("/api/tax/quickbooks-tax-codes", isAuthenticated, async (req, res) => {
+    try {
+      const qbConfig = await storage.getSystemSetting("quickbooks_config");
+      if (!qbConfig || !qbConfig.accessToken || !qbConfig.companyId) {
+        return res.status(400).json({ message: "QuickBooks not connected" });
+      }
+
+      const validQbConfig = await ensureValidTokens();
+      const qbTaxCodes = await quickBooksService.getTaxCodes(
+        validQbConfig.accessToken,
+        validQbConfig.companyId
+      );
+      
+      res.json(qbTaxCodes);
+    } catch (error) {
+      console.error("Error fetching QuickBooks tax codes:", error);
+      res.status(500).json({ message: "Failed to fetch QuickBooks tax codes" });
+    }
+  });
+
   // Product Tax Codes
   app.get("/api/tax/product-tax-codes", isAuthenticated, async (req, res) => {
     try {
