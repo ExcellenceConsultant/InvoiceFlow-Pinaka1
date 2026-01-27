@@ -14,7 +14,6 @@ import { apiRequest } from "@/lib/queryClient";
 
 const productSchema = z.object({
   name: z.string().min(1, "Product name is required"),
-  brand: z.string().optional(),
   description: z.string().optional(),
   basePrice: z.number().min(0, "Price must be positive"),
   salesPrice: z.number().min(0, "Sales price must be positive").optional(),
@@ -22,7 +21,6 @@ const productSchema = z.object({
   itemCode: z.string().optional(),
   packingSize: z.string().optional(),
   schemeDescription: z.string().optional(),
-  cartoonBarcode: z.string().optional(),
   grossWeight: z.number().min(0, "Gross weight must be positive").optional(),
   netWeight: z.number().min(0, "Net weight must be positive").optional(),
 });
@@ -42,7 +40,6 @@ export function ProductForm({ onClose, product }: ProductFormProps) {
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: product?.name || "",
-      brand: product?.brand || "",
       description: product?.description || "",
       basePrice: product ? parseFloat(product.basePrice) : 0,
       salesPrice: product?.salesPrice ? parseFloat(product.salesPrice) : 0,
@@ -50,7 +47,6 @@ export function ProductForm({ onClose, product }: ProductFormProps) {
       itemCode: product?.itemCode || "",
       packingSize: product?.packingSize || "",
       schemeDescription: product?.schemeDescription || "",
-      cartoonBarcode: product?.cartoonBarcode || "",
       grossWeight: product?.grossWeight ? parseFloat(product.grossWeight) : 0,
       netWeight: product?.netWeight ? parseFloat(product.netWeight) : 0,
     },
@@ -131,18 +127,6 @@ export function ProductForm({ onClose, product }: ProductFormProps) {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="brand">Brand</Label>
-                  <Input
-                    id="brand"
-                    placeholder="Enter brand"
-                    data-testid="input-product-brand"
-                    {...form.register("brand")}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
                   <Input
                     id="category"
@@ -204,16 +188,6 @@ export function ProductForm({ onClose, product }: ProductFormProps) {
                   placeholder="Enter scheme description"
                   data-testid="input-scheme-description"
                   {...form.register("schemeDescription")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cartoonBarcode">CARTOON BARCODE</Label>
-                <Input
-                  id="cartoonBarcode"
-                  placeholder="Enter cartoon barcode"
-                  data-testid="input-cartoon-barcode"
-                  {...form.register("cartoonBarcode")}
                 />
               </div>
 

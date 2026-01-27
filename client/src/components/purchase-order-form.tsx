@@ -240,7 +240,7 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
         productId,
         description: product.name,
         unitPrice: parseFloat(product.basePrice || 0),
-        productCode: product.itemCode || "",
+        productCode: product.cartoonBarcode || "",
         cartoonBarcode: product.cartoonBarcode || "",
         packingSize: product.packingSize || "",
         grossWeightKgs: parseFloat(product.grossWeight || 0),
@@ -507,7 +507,7 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
                           <SelectContent>
                             {products?.map((product: any) => (
                               <SelectItem key={product.id} value={product.id}>
-                                {product.name} ({product.itemCode || "No code"})
+                                {product.name} ({product.cartoonBarcode || "No code"})
                               </SelectItem>
                             ))}
                           </SelectContent>

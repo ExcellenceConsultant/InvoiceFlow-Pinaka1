@@ -487,7 +487,7 @@ export default function CreditMemoForm({
       quantity: quantity,
       unitPrice: 0,
       lineTotal: 0,
-      productCode: product.itemCode || "",
+      productCode: product.cartoonBarcode || "",
       cartoonBarcode: product.cartoonBarcode || "",
       packingSize: product.packingSize || "",
       grossWeightKgs: parseFloat(product.grossWeight || "0"),
@@ -1018,7 +1018,7 @@ export default function CreditMemoForm({
                                     productId: value,
                                     description: product.name,
                                     unitPrice: unitPrice,
-                                    productCode: product.itemCode || "",
+                                    productCode: product.cartoonBarcode || "",
                                     cartoonBarcode:
                                       product.cartoonBarcode || "",
                                     packingSize: product.packingSize || "",
@@ -1119,7 +1119,7 @@ export default function CreditMemoForm({
                                             .includes(
                                               productSearchTerm.toLowerCase(),
                                             ) ||
-                                          (product.itemCode ?? "")
+                                          (product.cartoonBarcode ?? "")
                                             .toLowerCase()
                                             .includes(
                                               productSearchTerm.toLowerCase(),
@@ -1156,7 +1156,7 @@ export default function CreditMemoForm({
                                           data-testid={`option-product-${product.id}`}
                                         >
                                           {product.name} -{" "}
-                                          {product.itemCode || "No Code"} (
+                                          {product.cartoonBarcode || "No Code"} (
                                           {product.category})
                                         </SelectItem>
                                       ))

@@ -676,7 +676,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
       quantity: quantity,
       unitPrice: 0,
       lineTotal: 0,
-      productCode: product.itemCode || "",
+      productCode: product.cartoonBarcode || "",
       cartoonBarcode: product.cartoonBarcode || "",
       packingSize: product.packingSize || "",
       grossWeightKgs: parseFloat(product.grossWeight || "0"),
@@ -1352,7 +1352,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                                     productId: value,
                                     description: product.name,
                                     unitPrice: unitPrice,
-                                    productCode: product.itemCode || "",
+                                    productCode: product.cartoonBarcode || "",
                                     cartoonBarcode:
                                       product.cartoonBarcode || "",
                                     packingSize: product.packingSize || "",
@@ -1465,7 +1465,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                                             .includes(
                                               productSearchTerm.toLowerCase(),
                                             ) ||
-                                          (product.itemCode ?? "")
+                                          (product.cartoonBarcode ?? "")
                                             .toLowerCase()
                                             .includes(
                                               productSearchTerm.toLowerCase(),
@@ -1503,7 +1503,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                                           data-testid={`option-product-${product.id}`}
                                         >
                                           {product.name} -{" "}
-                                          {product.itemCode || "No Code"} (
+                                          {product.cartoonBarcode || "No Code"} (
                                           {product.category})
                                         </SelectItem>
                                       ))

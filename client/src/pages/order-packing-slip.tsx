@@ -8,7 +8,6 @@ import { Link, useParams } from "wouter";
 interface OrderLineItem {
   id: string;
   productCode: string;
-  cartoonBarcode: string;
   packingSize: string;
   description: string;
   quantity: number;
@@ -452,7 +451,7 @@ export default function OrderPackingSlip() {
             <thead>
               <tr>
                 <th style={{ width: "8%" }}>Sr No.</th>
-                <th style={{ width: "15%" }}>CARTOON BARCODE</th>
+                <th style={{ width: "15%" }}>Item Code</th>
                 <th style={{ width: "45%" }}>Product Description</th>
                 <th style={{ width: "17%" }}>Packing Size</th>
                 <th style={{ width: "15%" }}>Quantity (Carton)</th>
@@ -475,7 +474,7 @@ export default function OrderPackingSlip() {
                   return (
                     <tr key={`item-${pageIndex}-${idx}`}>
                       <td className="text-center">{row.srNo}</td>
-                      <td>{row.item.cartoonBarcode || "—"}</td>
+                      <td>{row.item.productCode || "—"}</td>
                       <td>{row.item.description}</td>
                       <td>
                         {row.item.packingSize
