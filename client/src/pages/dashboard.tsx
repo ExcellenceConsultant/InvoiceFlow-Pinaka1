@@ -1,6 +1,5 @@
 import InventoryModal from "@/components/inventory-modal";
 import InvoiceForm from "@/components/invoice-form";
-import SchemeModal from "@/components/scheme-modal";
 import StatsCards from "@/components/stats-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,6 @@ import { useLocation } from "wouter";
 
 export default function Dashboard() {
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
-  const [showSchemeModal, setShowSchemeModal] = useState(false);
   const [showInventoryModal, setShowInventoryModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -311,13 +309,6 @@ export default function Dashboard() {
         <InvoiceForm
           onClose={() => setShowInvoiceForm(false)}
           onSuccess={() => setShowInvoiceForm(false)}
-        />
-      )}
-
-      {showSchemeModal && (
-        <SchemeModal
-          onClose={() => setShowSchemeModal(false)}
-          onSuccess={() => setShowSchemeModal(false)}
         />
       )}
 
