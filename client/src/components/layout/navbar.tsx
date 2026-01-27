@@ -16,7 +16,7 @@ export default function Navbar() {
       data-testid="navbar"
     >
       <div className="w-full px-4">
-        <div className="flex items-center h-14 gap-2">
+        <div className="flex items-center h-14 gap-4">
           {/* Logo - Left */}
           <Link
             href="/"
@@ -29,8 +29,8 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Navigation - Center */}
-          <div className="flex-1 flex justify-center">
+          {/* Navigation - After logo */}
+          <div className="flex-1 flex justify-start">
             <div className="hidden md:flex items-center space-x-0.5">
               <Link href="/">
                 <Button
