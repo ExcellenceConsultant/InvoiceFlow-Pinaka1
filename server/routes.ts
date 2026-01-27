@@ -3394,7 +3394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Build invoice line items (exclude 0-quantity scheme placeholders)
           // QB Alignment: Include tax code references for accurate tax sync
           const qbLineItems = [];
-          const userId = (req as any).user?.id;
+          const userId = (req as any).user?.userId;
           
           // Get default and non-taxable tax codes for fallback
           let defaultTaxCode: any = null;
@@ -3402,8 +3402,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             defaultTaxCode = await storage.getDefaultTaxCode(userId);
             nonTaxableCode = await storage.getNonTaxableTaxCode(userId);
+            console.log("Default tax code:", defaultTaxCode?.code, "QB ID:", defaultTaxCode?.qbTaxCodeId);
           } catch (e) {
-            console.log("Could not fetch default tax codes");
+            console.log("Could not fetch default tax codes:", e);
           }
           
           // Get tax details for this invoice if available
