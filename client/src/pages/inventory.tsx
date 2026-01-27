@@ -900,7 +900,6 @@ export default function Inventory() {
                         {getSortIcon("name")}
                       </div>
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Brand</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Item Code</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Packing Size</th>
@@ -929,7 +928,6 @@ export default function Inventory() {
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Gross Weight(LBS)</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Net Weight(LBS)</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Scheme Description</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">CARTOON BARCODE</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground sticky right-0 bg-card z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">Actions</th>
                   </tr>
                 </thead>
@@ -956,9 +954,6 @@ export default function Inventory() {
                           {product.description && (
                             <div className="text-xs text-muted-foreground">{product.description}</div>
                           )}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`product-brand-${product.id}`}>
-                          {product.brand || '-'}
                         </td>
                         <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`product-date-${product.id}`}>
                           {product.date ? formatDateWithoutTimezone(product.date) : '-'}
@@ -989,9 +984,6 @@ export default function Inventory() {
                         </td>
                         <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`product-scheme-description-${product.id}`}>
                           {product.schemeDescription || '-'}
-                        </td>
-                        <td className="py-3 px-4 text-sm font-mono text-muted-foreground" data-testid={`product-cartoon-barcode-${product.id}`}>
-                          {product.cartoonBarcode || '-'}
                         </td>
                         <td className="py-3 px-4 sticky right-0 bg-card z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">
                           <div className="flex space-x-2">
