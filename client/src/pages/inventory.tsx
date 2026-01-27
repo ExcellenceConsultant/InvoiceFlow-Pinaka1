@@ -877,35 +877,35 @@ export default function Inventory() {
               ))}
             </div>
           ) : filteredProducts.length > 0 ? (
-            <div className="overflow-x-auto relative">
-              <table className="w-full text-xs" data-testid="inventory-table">
+            <div className="overflow-x-auto relative mx-6">
+              <table className="w-full" data-testid="inventory-table">
                 <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="py-2 px-2 text-xs font-medium text-muted-foreground w-8">
+                  <tr className="border-b border-border">
+                    <th className="py-3 px-4 text-sm font-medium text-muted-foreground w-12">
                       <input 
                         type="checkbox"
                         checked={filteredProducts.length > 0 && selectedProducts.length === filteredProducts.length}
                         onChange={handleSelectAllProducts}
-                        className="w-3.5 h-3.5 cursor-pointer"
+                        className="w-4 h-4 cursor-pointer"
                         data-testid="checkbox-select-all-products"
                       />
                     </th>
                     <th 
-                      className="text-left py-2 px-2 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none min-w-[120px]"
+                      className="text-left py-3 px-4 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort("name")}
                       data-testid="sort-product-name"
                     >
                       <div className="flex items-center">
-                        Product
+                        Product Name
                         {getSortIcon("name")}
                       </div>
                     </th>
-                    <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap">Brand</th>
-                    <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap">Date</th>
-                    <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap">Code</th>
-                    <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap">Pack</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Brand</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Item Code</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Packing Size</th>
                     <th 
-                      className="text-left py-2 px-2 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none whitespace-nowrap"
+                      className="text-left py-3 px-4 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort("category")}
                       data-testid="sort-category"
                     >
@@ -915,22 +915,22 @@ export default function Inventory() {
                       </div>
                     </th>
                     <th 
-                      className="text-center py-2 px-2 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none whitespace-nowrap"
+                      className="text-left py-3 px-4 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
                       onClick={() => handleSort("qty")}
                       data-testid="sort-qty"
                     >
-                      <div className="flex items-center justify-center">
+                      <div className="flex items-center">
                         Qty
                         {getSortIcon("qty")}
                       </div>
                     </th>
-                    <th className="text-right py-2 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap">Base</th>
-                    <th className="text-right py-2 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap">Sales</th>
-                    <th className="text-center py-2 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap">Gross</th>
-                    <th className="text-center py-2 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap">Net</th>
-                    <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap">Scheme</th>
-                    <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap">Barcode</th>
-                    <th className="text-center py-2 px-2 text-xs font-medium text-muted-foreground sticky right-0 bg-card z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">Actions</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Base Price</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Sales Price</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Gross Weight(LBS)</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Net Weight(LBS)</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Scheme Description</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">CARTOON BARCODE</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground sticky right-0 bg-card z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -941,61 +941,64 @@ export default function Inventory() {
                         className="border-b border-border hover:bg-muted/20 transition-colors"
                         data-testid={`inventory-row-${product.id}`}
                       >
-                        <td className="py-2 px-2">
+                        <td className="py-3 px-4">
                           <input 
                             type="checkbox"
                             checked={selectedProducts.includes(product.id)}
                             onChange={() => handleSelectProduct(product.id)}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-3.5 h-3.5 cursor-pointer"
+                            className="w-4 h-4 cursor-pointer"
                             data-testid={`checkbox-product-${product.id}`}
                           />
                         </td>
-                        <td className="py-2 px-2 text-xs text-foreground" data-testid={`product-name-${product.id}`}>
-                          <div className="font-medium truncate max-w-[140px]" title={product.name}>{product.name}</div>
+                        <td className="py-3 px-4 text-sm text-foreground" data-testid={`product-name-${product.id}`}>
+                          <div className="font-medium">{product.name}</div>
+                          {product.description && (
+                            <div className="text-xs text-muted-foreground">{product.description}</div>
+                          )}
                         </td>
-                        <td className="py-2 px-2 text-xs text-muted-foreground whitespace-nowrap" data-testid={`product-brand-${product.id}`}>
+                        <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`product-brand-${product.id}`}>
                           {product.brand || '-'}
                         </td>
-                        <td className="py-2 px-2 text-xs text-muted-foreground whitespace-nowrap" data-testid={`product-date-${product.id}`}>
+                        <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`product-date-${product.id}`}>
                           {product.date ? formatDateWithoutTimezone(product.date) : '-'}
                         </td>
-                        <td className="py-2 px-2 text-xs font-mono text-muted-foreground whitespace-nowrap" data-testid={`product-item-code-${product.id}`}>
+                        <td className="py-3 px-4 text-sm font-mono text-muted-foreground" data-testid={`product-item-code-${product.id}`}>
                           {product.itemCode || '-'}
                         </td>
-                        <td className="py-2 px-2 text-xs text-muted-foreground whitespace-nowrap" data-testid={`product-packing-size-${product.id}`}>
+                        <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`product-packing-size-${product.id}`}>
                           {product.packingSize || '-'}
                         </td>
-                        <td className="py-2 px-2 text-xs text-muted-foreground whitespace-nowrap" data-testid={`product-category-${product.id}`}>
+                        <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`product-category-${product.id}`}>
                           {product.category || "Uncategorized"}
                         </td>
-                        <td className="py-2 px-2 text-xs text-foreground text-center" data-testid={`product-qty-${product.id}`}>
+                        <td className="py-3 px-4 text-sm text-foreground" data-testid={`product-qty-${product.id}`}>
                           {product.qty || 0}
                         </td>
-                        <td className="py-2 px-2 text-xs text-foreground text-right whitespace-nowrap" data-testid={`product-price-${product.id}`}>
+                        <td className="py-3 px-4 text-sm text-foreground" data-testid={`product-price-${product.id}`}>
                           ${parseFloat(product.basePrice || 0).toFixed(2)}
                         </td>
-                        <td className="py-2 px-2 text-xs text-foreground text-right whitespace-nowrap" data-testid={`product-sales-price-${product.id}`}>
+                        <td className="py-3 px-4 text-sm text-foreground" data-testid={`product-sales-price-${product.id}`}>
                           ${parseFloat(product.salesPrice || 0).toFixed(2)}
                         </td>
-                        <td className="py-2 px-2 text-xs text-muted-foreground text-center" data-testid={`product-gross-weight-${product.id}`}>
+                        <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`product-gross-weight-${product.id}`}>
                           {product.grossWeight || '-'}
                         </td>
-                        <td className="py-2 px-2 text-xs text-muted-foreground text-center" data-testid={`product-net-weight-${product.id}`}>
+                        <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`product-net-weight-${product.id}`}>
                           {product.netWeight || '-'}
                         </td>
-                        <td className="py-2 px-2 text-xs text-muted-foreground truncate max-w-[80px]" data-testid={`product-scheme-description-${product.id}`} title={product.schemeDescription}>
+                        <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`product-scheme-description-${product.id}`}>
                           {product.schemeDescription || '-'}
                         </td>
-                        <td className="py-2 px-2 text-xs font-mono text-muted-foreground whitespace-nowrap" data-testid={`product-cartoon-barcode-${product.id}`}>
+                        <td className="py-3 px-4 text-sm font-mono text-muted-foreground" data-testid={`product-cartoon-barcode-${product.id}`}>
                           {product.cartoonBarcode || '-'}
                         </td>
-                        <td className="py-2 px-2 sticky right-0 bg-card z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
-                          <div className="flex space-x-1 justify-center">
+                        <td className="py-3 px-4 sticky right-0 bg-card z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">
+                          <div className="flex space-x-2">
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              className="h-7 w-7 p-0"
+                              className="h-8 w-8 p-0"
                               onClick={() => {
                                 setEditingProduct(product);
                                 setShowProductForm(true);
@@ -1003,17 +1006,17 @@ export default function Inventory() {
                               disabled={!permissions.canManageProducts}
                               data-testid={`button-edit-product-${product.id}`}
                             >
-                              <Edit size={12} />
+                              <Edit size={14} />
                             </Button>
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                               onClick={() => handleDeleteProduct(product.id, product.name)}
                               disabled={!permissions.canManageProducts}
                               data-testid={`button-delete-product-${product.id}`}
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={14} />
                             </Button>
                           </div>
                         </td>
