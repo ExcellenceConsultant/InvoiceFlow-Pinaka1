@@ -260,6 +260,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProduct(id: string): Promise<boolean> {
+    // Delete all related records first (cascade)
+    await db.delete(invoiceLineItems).where(eq(invoiceLineItems.productId, id));
+    await db.delete(creditMemoLineItems).where(eq(creditMemoLineItems.productId, id));
+    await db.delete(orderLineItems).where(eq(orderLineItems.productId, id));
+    await db.delete(productVariants).where(eq(productVariants.productId, id));
+    await db.delete(productSchemes).where(eq(productSchemes.productId, id));
+    await db.delete(customerProductMargins).where(eq(customerProductMargins.productId, id));
+    await db.delete(productPriceRule).where(eq(productPriceRule.productId, id));
+    await db.delete(customerProductPriceRule).where(eq(customerProductPriceRule.productId, id));
+    await db.delete(productTaxCodes).where(eq(productTaxCodes.productId, id));
+    
+    // Now delete the product itself
     const result = await db.delete(products).where(eq(products.id, id));
     return (result.rowCount || 0) > 0;
   }
