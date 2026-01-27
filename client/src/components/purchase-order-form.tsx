@@ -485,6 +485,7 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <h3 className="text-lg font-semibold">Line Items</h3>
                   <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Filter by Category:</span>
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                       <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
                         <SelectValue placeholder="Filter by category" />
@@ -498,16 +499,6 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addLineItem}
-                      data-testid="button-add-line-item"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Item
-                    </Button>
                   </div>
                 </div>
 
@@ -591,6 +582,18 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
                     </div>
                   ))}
                 </div>
+
+                {/* Add Item button below products */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addLineItem}
+                  data-testid="button-add-line-item"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Item
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
