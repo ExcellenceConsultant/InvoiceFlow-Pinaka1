@@ -15,21 +15,21 @@ export default function Navbar() {
       className="bg-card/80 glass-effect border-b border-border backdrop-blur-lg sticky top-0 z-50"
       data-testid="navbar"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center">
+      <div className="w-full px-4">
+        <div className="flex justify-between items-center h-16 gap-4">
+          <div className="flex items-center flex-1 min-w-0">
             <Link
               href="/"
-              className="flex items-center mr-8 flex-shrink-0 gap-2"
+              className="flex items-center mr-4 flex-shrink-0 gap-2"
               data-testid="link-home"
             >
-              <img src={pinakaLogo} alt="Pinaka Foods Inc" className="h-12 w-12 object-contain" />
-              <span className="text-xl font-bold text-foreground whitespace-nowrap">
+              <img src={pinakaLogo} alt="Pinaka Foods Inc" className="h-10 w-10 object-contain" />
+              <span className="text-lg font-bold text-foreground whitespace-nowrap hidden lg:block">
                 InvoiceFlow
               </span>
             </Link>
 
-            <div className="hidden md:flex items-center space-x-6">
+            <div className="hidden md:flex items-center space-x-1 flex-wrap">
               <Link href="/">
                 <Button
                   variant={location === "/" ? "default" : "ghost"}
@@ -134,10 +134,10 @@ export default function Navbar() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 flex-shrink-0">
             {/* QuickBooks Connection Status */}
             <div
-              className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
+              className={`hidden sm:flex items-center space-x-1.5 px-2 py-1 rounded-md ${
                 isQuickBooksConnected
                   ? "bg-accent/10 text-accent-foreground"
                   : "bg-destructive/10 text-destructive-foreground"
@@ -151,14 +151,14 @@ export default function Navbar() {
                     : "bg-destructive"
                 }`}
               />
-              <span className="text-sm font-medium">
-                {isQuickBooksConnected ? "QB Connected" : "QB Disconnected"}
+              <span className="text-xs font-medium whitespace-nowrap">
+                {isQuickBooksConnected ? "QB" : "QB Off"}
               </span>
             </div>
 
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               data-testid="button-notifications"
             >
               <Bell size={18} />
@@ -166,7 +166,7 @@ export default function Navbar() {
 
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={logout}
               data-testid="button-logout"
             >
@@ -174,7 +174,7 @@ export default function Navbar() {
             </Button>
 
             <div
-              className="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center"
+              className="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center flex-shrink-0"
               data-testid="user-avatar"
             >
               <span className="text-xs font-medium text-white">
