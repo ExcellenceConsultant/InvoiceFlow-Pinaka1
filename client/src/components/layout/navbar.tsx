@@ -29,8 +29,8 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Navigation - After logo */}
-          <div className="flex-1 flex justify-start">
+          {/* Navigation - Center */}
+          <div className="flex-1 flex justify-center">
             <div className="hidden md:flex items-center space-x-0.5">
               <Link href="/">
                 <Button
