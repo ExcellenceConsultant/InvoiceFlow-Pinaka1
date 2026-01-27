@@ -892,9 +892,9 @@ function CreditMemoView() {
                 </div>
               </div>
 
-              {/* Notes Section */}
+              {/* Terms and Conditions Section */}
               <div className="notes-section">
-                <div className="notes-label">Notes:</div>
+                <div className="notes-label">Terms and Conditions:</div>
                 <div className="notes-box">
                   {((creditMemo as any).notes || "")
                     .split("\n")
