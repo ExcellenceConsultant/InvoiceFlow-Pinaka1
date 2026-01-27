@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -553,6 +554,7 @@ function TaxCodesTab() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCode, setEditingCode] = useState<TaxCode | null>(null);
+  const [selectedRateIds, setSelectedRateIds] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     code: "",
     name: "",
@@ -565,6 +567,10 @@ function TaxCodesTab() {
 
   const { data: codes = [], isLoading } = useQuery<TaxCode[]>({
     queryKey: ["/api/tax/codes"],
+  });
+
+  const { data: allRates = [] } = useQuery<TaxRate[]>({
+    queryKey: ["/api/tax/rates"],
   });
 
   const createMutation = useMutation({
@@ -581,7 +587,7 @@ function TaxCodesTab() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
-      apiRequest("PATCH", `/api/tax/codes/${id}`, data),
+      apiRequest("PUT", `/api/tax/codes/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tax/codes"] });
       toast({ title: "Tax code updated" });
@@ -605,11 +611,12 @@ function TaxCodesTab() {
 
   const resetForm = () => {
     setFormData({ code: "", name: "", description: "", isTaxable: true, isDefault: false, qbTaxCodeId: "", status: "active" });
+    setSelectedRateIds([]);
     setEditingCode(null);
     setIsDialogOpen(false);
   };
 
-  const handleEdit = (code: TaxCode) => {
+  const handleEdit = async (code: TaxCode) => {
     setEditingCode(code);
     setFormData({
       code: code.code,
@@ -620,7 +627,26 @@ function TaxCodesTab() {
       qbTaxCodeId: code.qbTaxCodeId || "",
       status: code.status,
     });
+    try {
+      const response = await fetch(`/api/tax/codes/${code.id}/rates`);
+      if (response.ok) {
+        const linkedRates = await response.json();
+        setSelectedRateIds(linkedRates.map((r: any) => r.taxRateId));
+      } else {
+        setSelectedRateIds([]);
+      }
+    } catch {
+      setSelectedRateIds([]);
+    }
     setIsDialogOpen(true);
+  };
+
+  const handleRateToggle = (rateId: string) => {
+    setSelectedRateIds(prev => 
+      prev.includes(rateId) 
+        ? prev.filter(id => id !== rateId)
+        : [...prev, rateId]
+    );
   };
 
   const handleSubmit = () => {
@@ -628,6 +654,7 @@ function TaxCodesTab() {
       ...formData,
       description: formData.description || null,
       qbTaxCodeId: formData.qbTaxCodeId || null,
+      taxRateIds: selectedRateIds,
     };
     if (editingCode) {
       updateMutation.mutate({ id: editingCode.id, data: submitData });
@@ -771,6 +798,38 @@ function TaxCodesTab() {
                 </SelectContent>
               </Select>
             </div>
+            {formData.isTaxable && (
+              <div className="space-y-2">
+                <Label>Tax Rates</Label>
+                <div className="text-sm text-muted-foreground mb-2">
+                  Select the tax rates that apply to this tax code
+                </div>
+                <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                  {allRates.filter(r => r.status === "active").length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No active tax rates available. Create tax rates first.</div>
+                  ) : (
+                    allRates.filter(r => r.status === "active").map((rate) => (
+                      <div key={rate.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`rate-${rate.id}`}
+                          checked={selectedRateIds.includes(rate.id)}
+                          onCheckedChange={() => handleRateToggle(rate.id)}
+                          data-testid={`checkbox-rate-${rate.id}`}
+                        />
+                        <label htmlFor={`rate-${rate.id}`} className="text-sm cursor-pointer flex-1">
+                          {rate.name} ({rate.rate}%)
+                        </label>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {selectedRateIds.length === 0 && formData.isTaxable && (
+                  <div className="text-sm text-amber-600">
+                    Warning: No tax rates selected. Tax will calculate as 0%.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={resetForm}>Cancel</Button>
