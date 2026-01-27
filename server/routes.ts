@@ -1,3 +1,4 @@
+import axios from "axios";
 import {
   insertCreditMemoLineItemSchema,
   insertCreditMemoSchema,
@@ -3080,17 +3081,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
               "Customer creation failed:",
               createError.response?.data || createError.message,
             );
-            console.error(
-              "Creation error details:",
-              JSON.stringify(createError.response?.data, null, 2),
-            );
-            const errorMessage =
-              createError.response?.data?.Fault?.Error?.[0]?.Detail ||
-              createError.response?.data?.Fault?.Error?.[0]?.code ||
-              "Failed to create customer in QuickBooks";
-            return res
-              .status(500)
-              .json({ message: errorMessage, action: "create" });
+            
+            const errorDetail = createError.response?.data?.Fault?.Error?.[0]?.Detail || "";
+            
+            // If name already exists, try harder to find it
+            if (errorDetail.includes("already exists") || errorDetail.includes("Name supplied")) {
+              console.log("Name already exists in QB. Trying more aggressive search...");
+              
+              // Try to find by partial/contains match in customers
+              try {
+                const allCustomersResp = await axios.get(
+                  `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${validQbConfig.accessToken}`,
+                      Accept: "application/json",
+                    },
+                  },
+                );
+                const allCustomers = allCustomersResp.data.QueryResponse?.Customer || [];
+                
+                // Search with trimmed and normalized comparison
+                const normalizedSearch = customer.name.trim().toLowerCase();
+                const foundCustomer = allCustomers.find((c: any) => {
+                  const displayName = (c.DisplayName || "").trim().toLowerCase();
+                  const companyName = (c.CompanyName || "").trim().toLowerCase();
+                  return displayName === normalizedSearch || companyName === normalizedSearch;
+                });
+                
+                if (foundCustomer) {
+                  console.log(`Found existing customer on retry:`, foundCustomer.Id, foundCustomer.DisplayName);
+                  qbCustomer = foundCustomer;
+                } else {
+                  // Also check if it exists as a Vendor (QB shares name namespace)
+                  const allVendorsResp = await axios.get(
+                    `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=SELECT * FROM Vendor WHERE Active = true MAXRESULTS 1000`,
+                    {
+                      headers: {
+                        Authorization: `Bearer ${validQbConfig.accessToken}`,
+                        Accept: "application/json",
+                      },
+                    },
+                  );
+                  const allVendors = allVendorsResp.data.QueryResponse?.Vendor || [];
+                  
+                  const foundVendor = allVendors.find((v: any) => {
+                    const displayName = (v.DisplayName || "").trim().toLowerCase();
+                    const companyName = (v.CompanyName || "").trim().toLowerCase();
+                    return displayName === normalizedSearch || companyName === normalizedSearch;
+                  });
+                  
+                  if (foundVendor) {
+                    console.log(`Name exists as Vendor in QB:`, foundVendor.Id, foundVendor.DisplayName);
+                    return res.status(400).json({
+                      message: `This name already exists as a Vendor in QuickBooks (${foundVendor.DisplayName}). Please use a different name or sync as a vendor.`,
+                      action: "name_conflict_vendor",
+                    });
+                  }
+                }
+              } catch (searchErr) {
+                console.error("Aggressive search failed:", searchErr);
+              }
+              
+              if (!qbCustomer) {
+                return res.status(500).json({
+                  message: `The name "${customer.name}" already exists in QuickBooks but couldn't be found. Please check QuickBooks for a customer/vendor with a similar name.`,
+                  action: "name_exists",
+                });
+              }
+            } else {
+              const errorMessage =
+                createError.response?.data?.Fault?.Error?.[0]?.Detail ||
+                createError.response?.data?.Fault?.Error?.[0]?.code ||
+                "Failed to create customer in QuickBooks";
+              return res
+                .status(500)
+                .json({ message: errorMessage, action: "create" });
+            }
           }
         }
 
