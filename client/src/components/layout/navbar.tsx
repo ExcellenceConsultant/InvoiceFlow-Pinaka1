@@ -16,20 +16,22 @@ export default function Navbar() {
       data-testid="navbar"
     >
       <div className="w-full px-4">
-        <div className="flex justify-between items-center h-16 gap-4">
-          <div className="flex items-center flex-1 min-w-0">
-            <Link
-              href="/"
-              className="flex items-center mr-4 flex-shrink-0 gap-2"
-              data-testid="link-home"
-            >
-              <img src={pinakaLogo} alt="Pinaka Foods Inc" className="h-10 w-10 object-contain" />
-              <span className="text-lg font-bold text-foreground whitespace-nowrap hidden lg:block">
-                InvoiceFlow
-              </span>
-            </Link>
+        <div className="flex items-center h-14 gap-2">
+          {/* Logo - Left */}
+          <Link
+            href="/"
+            className="flex items-center flex-shrink-0 gap-2"
+            data-testid="link-home"
+          >
+            <img src={pinakaLogo} alt="Pinaka Foods Inc" className="h-9 w-9 object-contain" />
+            <span className="text-base font-bold text-foreground whitespace-nowrap hidden xl:block">
+              InvoiceFlow
+            </span>
+          </Link>
 
-            <div className="hidden md:flex items-center space-x-1 flex-wrap">
+          {/* Navigation - Center */}
+          <div className="flex-1 flex justify-center">
+            <div className="hidden md:flex items-center space-x-0.5">
               <Link href="/">
                 <Button
                   variant={location === "/" ? "default" : "ghost"}
@@ -134,7 +136,8 @@ export default function Navbar() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 flex-shrink-0">
+          {/* Right side - User actions */}
+          <div className="flex items-center space-x-1.5 flex-shrink-0">
             {/* QuickBooks Connection Status */}
             <div
               className={`hidden sm:flex items-center space-x-1.5 px-2 py-1 rounded-md ${
