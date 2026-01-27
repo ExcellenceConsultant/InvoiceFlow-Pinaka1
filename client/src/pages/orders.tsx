@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,6 +28,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   Check,
+  ChevronDown,
   Edit,
   Eye,
   FileText,
@@ -63,6 +69,8 @@ export default function Orders() {
   const permissions = usePermissions();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"SO" | "PO">("SO");
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [editingOrder, setEditingOrder] = useState<any>(null);
@@ -79,6 +87,35 @@ export default function Orders() {
   const { data: customers } = useQuery<any[]>({
     queryKey: ["/api/customers"],
   });
+
+  const { data: products } = useQuery<any[]>({
+    queryKey: ["/api/products"],
+  });
+
+  const categories = useMemo(() => {
+    if (!products) return [];
+    const cats = products
+      .map((p: any) => p.category)
+      .filter((c: string) => c && c.trim() !== "");
+    return Array.from(new Set(cats)).sort();
+  }, [products]);
+
+  const handleCategoryClick = (category: string) => {
+    setSelectedCategories((prev) => {
+      if (prev.includes(category)) {
+        return prev.filter((c) => c !== category);
+      }
+      return [...prev, category];
+    });
+  };
+
+  const handleAllCategoriesClick = () => {
+    if (selectedCategories.length === 0 || selectedCategories.length === categories.length) {
+      setSelectedCategories([]);
+    } else {
+      setSelectedCategories([]);
+    }
+  };
 
   const [, setLocation] = useLocation();
 
@@ -154,8 +191,15 @@ export default function Orders() {
       const matchesStatus =
         statusFilter === "all" || order.status === statusFilter;
 
+      const matchesCategory =
+        selectedCategories.length === 0 ||
+        (order.lineItems &&
+          order.lineItems.some((item: any) =>
+            selectedCategories.includes(item.category)
+          ));
+
       if (!normalizedSearch) {
-        return matchesStatus;
+        return matchesStatus && matchesCategory;
       }
 
       const matchesSearch =
@@ -163,7 +207,7 @@ export default function Orders() {
         customerName.toLowerCase().includes(normalizedSearch) ||
         order.purchaseOrder?.toLowerCase().includes(normalizedSearch);
 
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesSearch && matchesCategory;
     });
 
     // Sort orders
@@ -208,7 +252,7 @@ export default function Orders() {
     }
 
     return filtered;
-  }, [orders, searchTerm, statusFilter, activeTab, sortConfig, customers]);
+  }, [orders, searchTerm, statusFilter, activeTab, sortConfig, customers, selectedCategories]);
 
   const handleSort = (key: SortKey) => {
     setSortConfig((prev) => {
@@ -370,6 +414,66 @@ export default function Orders() {
                   ))}
                 </SelectContent>
               </Select>
+              <Popover open={categoryDropdownOpen} onOpenChange={setCategoryDropdownOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={categoryDropdownOpen}
+                    className="w-full md:w-[200px] justify-between font-normal"
+                    data-testid="select-category-filter"
+                  >
+                    <span className="truncate">
+                      {selectedCategories.length === 0 || selectedCategories.length === categories.length
+                        ? "All Categories"
+                        : selectedCategories.length === 1
+                        ? selectedCategories[0]
+                        : `${selectedCategories.slice(0, 2).join(", ")}${selectedCategories.length > 2 ? ` (+${selectedCategories.length - 2})` : ""}`}
+                    </span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-0" align="start">
+                  <div className="max-h-[300px] overflow-y-auto p-2">
+                    <div
+                      className="flex items-center px-2 py-1.5 cursor-pointer hover:bg-muted rounded-md"
+                      onClick={handleAllCategoriesClick}
+                      data-testid="category-option-all"
+                    >
+                      <div className={`w-4 h-4 border rounded mr-2 flex items-center justify-center ${selectedCategories.length === 0 || selectedCategories.length === categories.length ? "bg-primary border-primary" : "border-input"}`}>
+                        {(selectedCategories.length === 0 || selectedCategories.length === categories.length) && <Check size={12} className="text-primary-foreground" />}
+                      </div>
+                      <span className="text-sm">All Categories</span>
+                    </div>
+                    {(categories as string[]).map((category: string) => (
+                      <div
+                        key={category}
+                        className="flex items-center px-2 py-1.5 cursor-pointer hover:bg-muted rounded-md"
+                        onClick={() => handleCategoryClick(category)}
+                        data-testid={`category-option-${category.replace(/\s+/g, '-').toLowerCase()}`}
+                      >
+                        <div className={`w-4 h-4 border rounded mr-2 flex items-center justify-center ${selectedCategories.includes(category) ? "bg-primary border-primary" : "border-input"}`}>
+                          {selectedCategories.includes(category) && <Check size={12} className="text-primary-foreground" />}
+                        </div>
+                        <span className="text-sm">{category}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedCategories.length > 0 && (
+                    <div className="border-t p-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => setSelectedCategories([])}
+                        data-testid="button-clear-categories"
+                      >
+                        Clear Selection
+                      </Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
 
             {isLoading ? (
