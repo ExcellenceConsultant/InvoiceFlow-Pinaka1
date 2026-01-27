@@ -777,14 +777,14 @@ function TaxCodesTab() {
               <Label>QuickBooks Tax Code</Label>
               <div className="flex gap-2">
                 <Select 
-                  value={formData.qbTaxCodeId} 
-                  onValueChange={(v) => setFormData({ ...formData, qbTaxCodeId: v })}
+                  value={formData.qbTaxCodeId || "none"} 
+                  onValueChange={(v) => setFormData({ ...formData, qbTaxCodeId: v === "none" ? "" : v })}
                 >
                   <SelectTrigger className="flex-1" data-testid="select-qb-tax-code">
                     <SelectValue placeholder="Select QB Tax Code" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {qbTaxCodes.map((qbCode) => (
                       <SelectItem key={qbCode.Id} value={qbCode.Id}>
                         {qbCode.Name} ({qbCode.Taxable ? "Taxable" : "Non-Taxable"})
