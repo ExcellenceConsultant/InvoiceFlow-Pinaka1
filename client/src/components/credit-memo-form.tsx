@@ -487,7 +487,7 @@ export default function CreditMemoForm({
       quantity: quantity,
       unitPrice: 0,
       lineTotal: 0,
-      productCode: product.cartoonBarcode || "",
+      productCode: product.itemCode || "",
       cartoonBarcode: product.cartoonBarcode || "",
       packingSize: product.packingSize || "",
       grossWeightKgs: parseFloat(product.grossWeight || "0"),
@@ -1018,7 +1018,7 @@ export default function CreditMemoForm({
                                     productId: value,
                                     description: product.name,
                                     unitPrice: unitPrice,
-                                    productCode: product.cartoonBarcode || "",
+                                    productCode: product.itemCode || "",
                                     cartoonBarcode:
                                       product.cartoonBarcode || "",
                                     packingSize: product.packingSize || "",

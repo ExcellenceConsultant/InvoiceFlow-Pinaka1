@@ -307,7 +307,7 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
         productId,
         description: product.name,
         unitPrice,
-        productCode: product.cartoonBarcode || "",
+        productCode: product.itemCode || "",
         cartoonBarcode: product.cartoonBarcode || "",
         packingSize: product.packingSize || "",
         grossWeightKgs: parseFloat(product.grossWeight || 0),

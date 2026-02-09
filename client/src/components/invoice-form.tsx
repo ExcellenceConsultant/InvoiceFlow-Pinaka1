@@ -677,7 +677,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
       quantity: quantity,
       unitPrice: 0,
       lineTotal: 0,
-      productCode: product.cartoonBarcode || "",
+      productCode: product.itemCode || "",
       cartoonBarcode: product.cartoonBarcode || "",
       packingSize: product.packingSize || "",
       grossWeightKgs: parseFloat(product.grossWeight || "0"),
@@ -1353,7 +1353,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                                     productId: value,
                                     description: product.name,
                                     unitPrice: unitPrice,
-                                    productCode: product.cartoonBarcode || "",
+                                    productCode: product.itemCode || "",
                                     cartoonBarcode:
                                       product.cartoonBarcode || "",
                                     packingSize: product.packingSize || "",
