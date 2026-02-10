@@ -996,7 +996,7 @@ function InvoiceView() {
                   <span></span>
                 </div>
                 <div className="footer-company">
-                  Excellence Consultant
+                  Pinaka Foods, Inc.
                 </div>
               </div>
             </>
