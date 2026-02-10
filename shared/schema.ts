@@ -58,6 +58,7 @@ export const customers = pgTable("customers", {
   type: text("type").notNull().default("customer"), // "customer" or "vendor"
   isActive: boolean("is_active").default(true),
   defaultMarginPercent: decimal("default_margin_percent", { precision: 5, scale: 2 }), // Customer default margin for pricing
+  customerCategory: text("customer_category"),
   quickbooksCustomerId: text("quickbooks_customer_id"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
