@@ -4433,7 +4433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const rulesWithCustomers = rules.map((rule: any) => ({
           ...rule,
-          customer: customerMap.get(rule.customerId),
+          customer: rule.customerId ? customerMap.get(rule.customerId) : null,
         }));
         
         res.json(rulesWithCustomers);
@@ -4452,16 +4452,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const userId = (req as any).user?.userId;
-        const { customerId, marginPercent, effectiveFromDate, status } = req.body;
+        const { customerId, customerCategory, marginPercent, effectiveFromDate, status } = req.body;
 
-        const rule = await storage.createCustomerPriceRule({
-          customerId,
+        const ruleData: any = {
           marginPercent: marginPercent?.toString(),
           effectiveFromDate: effectiveFromDate ? new Date(effectiveFromDate) : new Date(),
           status: status || "active",
           userId,
           createdBy: userId,
-        });
+        };
+
+        if (customerCategory) {
+          ruleData.customerCategory = customerCategory;
+        } else if (customerId) {
+          ruleData.customerId = customerId;
+        }
+
+        const rule = await storage.createCustomerPriceRule(ruleData);
         res.status(201).json(rule);
       } catch (error) {
         console.error("Error creating customer price rule:", error);

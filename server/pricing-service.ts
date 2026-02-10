@@ -152,7 +152,7 @@ async function getMarginPercent(
     };
   }
 
-  // Priority 2: Customer Price Rule (active, effective date check)
+  // Priority 2: Individual Customer Price Rule (active, effective date check)
   const customerRule = await db
     .select({ marginPercent: customerPriceRule.marginPercent })
     .from(customerPriceRule)
@@ -173,16 +173,44 @@ async function getMarginPercent(
     };
   }
 
-  // Fallback: Check legacy customer default margin
-  const customer = await db
-    .select({ defaultMarginPercent: customers.defaultMarginPercent })
+  // Priority 2b: Customer Category Price Rule
+  // Look up the customer's category, then find matching category-based rules
+  const customerData = await db
+    .select({ 
+      customerCategory: customers.customerCategory,
+      defaultMarginPercent: customers.defaultMarginPercent 
+    })
     .from(customers)
     .where(eq(customers.id, customerId))
     .limit(1);
 
-  if (customer.length > 0 && customer[0].defaultMarginPercent !== null) {
+  if (customerData.length > 0 && customerData[0].customerCategory) {
+    const categoryRule = await db
+      .select({ marginPercent: customerPriceRule.marginPercent })
+      .from(customerPriceRule)
+      .where(
+        and(
+          eq(customerPriceRule.customerCategory, customerData[0].customerCategory),
+          sql`${customerPriceRule.customerId} IS NULL`,
+          eq(customerPriceRule.status, "active"),
+          lte(customerPriceRule.effectiveFromDate, documentDate)
+        )
+      )
+      .orderBy(desc(customerPriceRule.effectiveFromDate))
+      .limit(1);
+
+    if (categoryRule.length > 0 && categoryRule[0].marginPercent !== null) {
+      return {
+        margin: parseFloat(categoryRule[0].marginPercent),
+        source: 'customer_default',
+      };
+    }
+  }
+
+  // Fallback: Check legacy customer default margin
+  if (customerData.length > 0 && customerData[0].defaultMarginPercent !== null) {
     return {
-      margin: parseFloat(customer[0].defaultMarginPercent),
+      margin: parseFloat(customerData[0].defaultMarginPercent),
       source: 'customer_default',
     };
   }

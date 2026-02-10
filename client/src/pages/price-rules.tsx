@@ -60,6 +60,7 @@ interface Customer {
   id: string;
   name: string;
   type: string;
+  customerCategory?: string;
 }
 
 export default function PriceRules() {
@@ -483,6 +484,8 @@ function CustomerPriceRuleTab() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<CustomerPriceRuleData | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [ruleMode, setRuleMode] = useState<"individual" | "category">("individual");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [marginPercent, setMarginPercent] = useState("");
   const [effectiveFromDate, setEffectiveFromDate] = useState(new Date().toISOString().split('T')[0]);
   const [status, setStatus] = useState("active");
@@ -501,16 +504,32 @@ function CustomerPriceRuleTab() {
     c.name.toLowerCase().includes(customerSearch.toLowerCase())
   );
 
+  const uniqueCategories = Array.from(
+    new Set(customerList.map(c => c.customerCategory).filter((c): c is string => !!c && c.trim() !== ""))
+  ).sort();
+
   const createMutation = useMutation({
-    mutationFn: async (data: { customerIds: string[]; marginPercent: number; effectiveFromDate: string; status: string }) => {
-      const promises = data.customerIds.map(customerId => 
+    mutationFn: async (data: { customerIds?: string[]; customerCategory?: string; marginPercent: number; effectiveFromDate: string; status: string }) => {
+      if (data.customerCategory) {
+        return apiRequest("POST", "/api/price-rules/customers", { 
+          customerCategory: data.customerCategory, 
+          marginPercent: data.marginPercent, 
+          effectiveFromDate: data.effectiveFromDate, 
+          status: data.status 
+        });
+      }
+      const promises = (data.customerIds || []).map(customerId => 
         apiRequest("POST", "/api/price-rules/customers", { customerId, marginPercent: data.marginPercent, effectiveFromDate: data.effectiveFromDate, status: data.status })
       );
       return Promise.all(promises);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/price-rules/customers"] });
-      toast({ title: `${selectedCustomerIds.length} customer price rule(s) created` });
+      if (ruleMode === "category") {
+        toast({ title: `Category price rule created for "${selectedCategory}"` });
+      } else {
+        toast({ title: `${selectedCustomerIds.length} customer price rule(s) created` });
+      }
       resetForm();
     },
     onError: () => {
@@ -549,6 +568,8 @@ function CustomerPriceRuleTab() {
     setIsDialogOpen(false);
     setEditingRule(null);
     setSelectedCustomerIds([]);
+    setRuleMode("individual");
+    setSelectedCategory("");
     setMarginPercent("");
     setEffectiveFromDate(new Date().toISOString().split('T')[0]);
     setStatus("active");
@@ -557,7 +578,7 @@ function CustomerPriceRuleTab() {
 
   const handleEdit = (rule: CustomerPriceRuleData) => {
     setEditingRule(rule);
-    setSelectedCustomerIds([rule.customerId]);
+    setSelectedCustomerIds(rule.customerId ? [rule.customerId] : []);
     setMarginPercent(rule.marginPercent);
     setEffectiveFromDate(rule.effectiveFromDate?.split('T')[0] || new Date().toISOString().split('T')[0]);
     setStatus(rule.status);
@@ -586,6 +607,13 @@ function CustomerPriceRuleTab() {
         id: editingRule.id, 
         data: { marginPercent: parseFloat(marginPercent), effectiveFromDate, status } 
       });
+    } else if (ruleMode === "category") {
+      createMutation.mutate({
+        customerCategory: selectedCategory,
+        marginPercent: parseFloat(marginPercent),
+        effectiveFromDate,
+        status,
+      });
     } else {
       createMutation.mutate({
         customerIds: selectedCustomerIds,
@@ -594,6 +622,20 @@ function CustomerPriceRuleTab() {
         status,
       });
     }
+  };
+
+  const isSubmitDisabled = () => {
+    if (!marginPercent || !effectiveFromDate || createMutation.isPending) return true;
+    if (editingRule) return false;
+    if (ruleMode === "category") return !selectedCategory;
+    return selectedCustomerIds.length === 0;
+  };
+
+  const getSubmitLabel = () => {
+    if (createMutation.isPending) return "Creating...";
+    if (editingRule) return "Update";
+    if (ruleMode === "category") return "Create Category Rule";
+    return `Create ${selectedCustomerIds.length} Rule(s)`;
   };
 
   if (isLoading) {
@@ -606,7 +648,7 @@ function CustomerPriceRuleTab() {
         <div>
           <CardTitle>Customer Price Rules</CardTitle>
           <CardDescription>
-            Default margin per customer for all products
+            Default margin per customer or customer category for all products
           </CardDescription>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -620,56 +662,108 @@ function CustomerPriceRuleTab() {
             <DialogHeader>
               <DialogTitle>{editingRule ? "Edit" : "Add"} Customer Price Rule</DialogTitle>
               <DialogDescription>
-                {editingRule ? "Update margin percentage for this customer" : "Select multiple customers and set margin percentage"}
+                {editingRule 
+                  ? "Update margin percentage for this rule" 
+                  : "Select individual customers or a customer category and set margin percentage"}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               {!editingRule && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Customers ({selectedCustomerIds.length} selected)</Label>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={selectAllCustomers} data-testid="button-select-all-customers">
-                        Select All
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={clearAllCustomers} data-testid="button-clear-customers">
-                        Clear
-                      </Button>
-                    </div>
+                <>
+                  <div className="space-y-2">
+                    <Label>Rule Type</Label>
+                    <Select value={ruleMode} onValueChange={(v) => { setRuleMode(v as "individual" | "category"); setSelectedCustomerIds([]); setSelectedCategory(""); }}>
+                      <SelectTrigger data-testid="select-rule-mode">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="individual">Individual Customers</SelectItem>
+                        <SelectItem value="category">By Customer Category</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Input
-                    placeholder="Search customers..."
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    data-testid="input-customer-search"
-                  />
-                  <ScrollArea className="h-48 border rounded-md p-2">
-                    {filteredCustomers.length === 0 ? (
-                      <p className="text-muted-foreground text-center py-4 text-sm">No customers found</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {filteredCustomers.map((c) => (
-                          <div key={c.id} className="flex items-center space-x-2 py-1">
-                            <Checkbox
-                              id={`customer-${c.id}`}
-                              checked={selectedCustomerIds.includes(c.id)}
-                              onCheckedChange={() => toggleCustomer(c.id)}
-                              data-testid={`checkbox-customer-${c.id}`}
-                            />
-                            <label htmlFor={`customer-${c.id}`} className="text-sm flex-1 cursor-pointer">
-                              {c.name}
-                            </label>
-                          </div>
-                        ))}
+
+                  {ruleMode === "individual" && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Customers ({selectedCustomerIds.length} selected)</Label>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={selectAllCustomers} data-testid="button-select-all-customers">
+                            Select All
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={clearAllCustomers} data-testid="button-clear-customers">
+                            Clear
+                          </Button>
+                        </div>
                       </div>
-                    )}
-                  </ScrollArea>
-                </div>
+                      <Input
+                        placeholder="Search customers..."
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                        data-testid="input-customer-search"
+                      />
+                      <ScrollArea className="h-48 border rounded-md p-2">
+                        {filteredCustomers.length === 0 ? (
+                          <p className="text-muted-foreground text-center py-4 text-sm">No customers found</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {filteredCustomers.map((c) => (
+                              <div key={c.id} className="flex items-center space-x-2 py-1">
+                                <Checkbox
+                                  id={`customer-${c.id}`}
+                                  checked={selectedCustomerIds.includes(c.id)}
+                                  onCheckedChange={() => toggleCustomer(c.id)}
+                                  data-testid={`checkbox-customer-${c.id}`}
+                                />
+                                <label htmlFor={`customer-${c.id}`} className="text-sm flex-1 cursor-pointer">
+                                  {c.name}
+                                  {c.customerCategory && <span className="text-muted-foreground ml-1">({c.customerCategory})</span>}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
+                  )}
+
+                  {ruleMode === "category" && (
+                    <div className="space-y-2">
+                      <Label>Customer Category</Label>
+                      {uniqueCategories.length > 0 ? (
+                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                          <SelectTrigger data-testid="select-customer-category">
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {uniqueCategories.map((cat) => {
+                              const count = customerList.filter(c => c.customerCategory === cat).length;
+                              return (
+                                <SelectItem key={cat} value={cat}>
+                                  {cat} ({count} customer{count !== 1 ? "s" : ""})
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm text-muted-foreground border rounded-md p-3">
+                          No customer categories found. Please assign categories to customers first.
+                        </p>
+                      )}
+                      {selectedCategory && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Applies to: {customerList.filter(c => c.customerCategory === selectedCategory).map(c => c.name).join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
               {editingRule && (
                 <div className="space-y-2">
-                  <Label>Customer</Label>
-                  <Input value={editingRule.customer?.name || 'Unknown'} disabled />
+                  <Label>{(editingRule as any).customerCategory ? "Customer Category" : "Customer"}</Label>
+                  <Input value={(editingRule as any).customerCategory || editingRule.customer?.name || 'Unknown'} disabled />
                 </div>
               )}
               <div className="space-y-2">
@@ -709,10 +803,10 @@ function CustomerPriceRuleTab() {
               <Button variant="outline" onClick={resetForm}>Cancel</Button>
               <Button 
                 onClick={handleSubmit} 
-                disabled={(editingRule ? false : selectedCustomerIds.length === 0) || !marginPercent || !effectiveFromDate || createMutation.isPending} 
+                disabled={isSubmitDisabled()} 
                 data-testid="button-submit-rule"
               >
-                {createMutation.isPending ? "Creating..." : editingRule ? "Update" : `Create ${selectedCustomerIds.length} Rule(s)`}
+                {getSubmitLabel()}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -725,7 +819,8 @@ function CustomerPriceRuleTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Customer</TableHead>
+                <TableHead>Customer / Category</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Margin %</TableHead>
                 <TableHead>Effective From</TableHead>
                 <TableHead>Status</TableHead>
@@ -735,7 +830,16 @@ function CustomerPriceRuleTab() {
             <TableBody>
               {rules.map((rule: any) => (
                 <TableRow key={rule.id}>
-                  <TableCell>{rule.customer?.name || 'Unknown'}</TableCell>
+                  <TableCell>
+                    {rule.customerCategory 
+                      ? rule.customerCategory
+                      : rule.customer?.name || 'Unknown'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={rule.customerCategory ? "secondary" : "outline"}>
+                      {rule.customerCategory ? "Category" : "Individual"}
+                    </Badge>
+                  </TableCell>
                   <TableCell>{rule.marginPercent}%</TableCell>
                   <TableCell>{new Date(rule.effectiveFromDate).toLocaleDateString()}</TableCell>
                   <TableCell>
