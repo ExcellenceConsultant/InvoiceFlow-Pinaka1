@@ -127,7 +127,8 @@ export const customerPriceRule = pgTable("customer_price_rule", {
   id: varchar("id")
     .primaryKey()
     .default(sql`gen_random_uuid()`),
-  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  customerId: varchar("customer_id").references(() => customers.id),
+  customerCategory: text("customer_category"),
   marginPercent: decimal("margin_percent", { precision: 5, scale: 2 }).notNull(),
   effectiveFromDate: timestamp("effective_from_date").notNull(),
   status: text("status").notNull().default("active"), // 'active' or 'inactive'
