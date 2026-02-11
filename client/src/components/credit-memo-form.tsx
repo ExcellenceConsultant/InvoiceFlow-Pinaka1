@@ -938,7 +938,7 @@ export default function CreditMemoForm({
                               ?.map((p: any) => p.category)
                               .filter(Boolean),
                           ),
-                        ).map((category) => (
+                        ).sort((a: any, b: any) => a.localeCompare(b)).map((category) => (
                           <SelectItem
                             key={category as string}
                             value={category as string}
@@ -1137,7 +1137,7 @@ export default function CreditMemoForm({
                                       ) || null;
 
                                     const displayProducts =
-                                      filteredProducts || [];
+                                      (filteredProducts || []).sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
 
                                     if (
                                       currentProduct &&

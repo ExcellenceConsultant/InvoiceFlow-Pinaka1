@@ -122,8 +122,8 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
   // Filter products by selected category
   const filteredProducts = useMemo(() => {
     if (!products) return [];
-    if (categoryFilter === "all") return products;
-    return products.filter((p: any) => p.category === categoryFilter);
+    const filtered = categoryFilter === "all" ? products : products.filter((p: any) => p.category === categoryFilter);
+    return [...filtered].sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
   }, [products, categoryFilter]);
 
   useEffect(() => {
