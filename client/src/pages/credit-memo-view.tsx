@@ -320,14 +320,14 @@ function CreditMemoView() {
   min-height: 40px;
   font-size: 11px;
   color: #000;
-  line-height: 1.6;
+  line-height: 1.4;
 }
 
 .notes-line {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
 }
 
 .notes-number {
@@ -385,7 +385,7 @@ function CreditMemoView() {
     display: flex !important;
     align-items: flex-start !important;
     gap: 8px !important;
-    margin-bottom: 8px !important;
+    margin-bottom: 2px !important;
   }
 
   .notes-number {
