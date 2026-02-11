@@ -3093,7 +3093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Try to find by partial/contains match in customers
               try {
                 const allCustomersResp = await axios.get(
-                  `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000`,
+                  `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000')}`,
                   {
                     headers: {
                       Authorization: `Bearer ${validQbConfig.accessToken}`,
@@ -3117,7 +3117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 } else {
                   // Also check if it exists as a Vendor (QB shares name namespace)
                   const allVendorsResp = await axios.get(
-                    `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=SELECT * FROM Vendor WHERE Active = true MAXRESULTS 1000`,
+                    `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=${encodeURIComponent('SELECT * FROM Vendor WHERE Active = true MAXRESULTS 1000')}`,
                     {
                       headers: {
                         Authorization: `Bearer ${validQbConfig.accessToken}`,
@@ -3281,7 +3281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Try to find by normalized match in vendors
               try {
                 const allVendorsResp = await axios.get(
-                  `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=SELECT * FROM Vendor WHERE Active = true MAXRESULTS 1000`,
+                  `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=${encodeURIComponent('SELECT * FROM Vendor WHERE Active = true MAXRESULTS 1000')}`,
                   {
                     headers: {
                       Authorization: `Bearer ${validQbConfig.accessToken}`,
@@ -3305,7 +3305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 } else {
                   // Also check if it exists as a Customer (QB shares name namespace)
                   const allCustomersResp = await axios.get(
-                    `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000`,
+                    `https://quickbooks.api.intuit.com/v3/company/${validQbConfig.companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000')}`,
                     {
                       headers: {
                         Authorization: `Bearer ${validQbConfig.accessToken}`,
@@ -3950,8 +3950,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!qbCustomer) {
           // Name exists as a different entity type - try to find any existing Customer with similar name
           try {
+            const custLikeQuery = `SELECT * FROM Customer WHERE DisplayName LIKE '${trimmedName.replace(/'/g, "''")}%'`;
             const searchResp = await axios.get(
-              `${qbBaseUrl}/v3/company/${qbConfig.companyId}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '${trimmedName.replace(/'/g, "''")}%'`,
+              `${qbBaseUrl}/v3/company/${qbConfig.companyId}/query?query=${encodeURIComponent(custLikeQuery)}`,
               {
                 headers: {
                   Authorization: `Bearer ${qbConfig.accessToken}`,
@@ -4084,8 +4085,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!qbVendor) {
           // Try broader search for existing vendor with similar name
           try {
+            const vendorLikeQuery = `SELECT * FROM Vendor WHERE DisplayName LIKE '${trimmedName.replace(/'/g, "''")}%'`;
             const searchResp = await axios.get(
-              `${qbBaseUrl}/v3/company/${qbConfig.companyId}/query?query=SELECT * FROM Vendor WHERE DisplayName LIKE '${trimmedName.replace(/'/g, "''")}%'`,
+              `${qbBaseUrl}/v3/company/${qbConfig.companyId}/query?query=${encodeURIComponent(vendorLikeQuery)}`,
               {
                 headers: {
                   Authorization: `Bearer ${qbConfig.accessToken}`,

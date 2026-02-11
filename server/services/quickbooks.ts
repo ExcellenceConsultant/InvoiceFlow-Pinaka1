@@ -519,8 +519,9 @@ export class QuickBooksService {
 
       console.log(`Searching for vendor with DisplayName: "${vendorName}"`);
 
+      const vendorQuery = `SELECT * FROM Vendor WHERE DisplayName = '${escapedName}'`;
       const response = await axios.get(
-        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=SELECT * FROM Vendor WHERE DisplayName = '${escapedName}'`,
+        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=${encodeURIComponent(vendorQuery)}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -545,7 +546,7 @@ export class QuickBooksService {
 
       // If exact match fails, try to get all vendors and find by DisplayName
       const allVendorsResponse = await axios.get(
-        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=SELECT * FROM Vendor`,
+        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM Vendor')}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -658,8 +659,9 @@ export class QuickBooksService {
       const escapedSKU = trimmedSKU.replace(/'/g, "''");
       console.log(`Searching for item with SKU: "${trimmedSKU}"`);
 
+      const skuQuery = `SELECT * FROM Item WHERE Sku = '${escapedSKU}'`;
       const response = await axios.get(
-        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=SELECT * FROM Item WHERE Sku = '${escapedSKU}'`,
+        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=${encodeURIComponent(skuQuery)}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -696,8 +698,9 @@ export class QuickBooksService {
       const escapedName = itemName.replace(/'/g, "''");
       console.log(`Searching for item with Name: "${itemName}"`);
 
+      const itemNameQuery = `SELECT * FROM Item WHERE Name = '${escapedName}'`;
       const response = await axios.get(
-        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=SELECT * FROM Item WHERE Name = '${escapedName}'`,
+        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=${encodeURIComponent(itemNameQuery)}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -736,7 +739,7 @@ export class QuickBooksService {
       console.log("Fetching tax codes from QuickBooks...");
       
       const response = await axios.get(
-        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=SELECT * FROM TaxCode`,
+        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM TaxCode')}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -849,8 +852,9 @@ export class QuickBooksService {
 
       console.log(`Searching for customer with DisplayName: "${customerName}"`);
 
+      const query = `SELECT * FROM Customer WHERE DisplayName = '${escapedName}'`;
       const response = await axios.get(
-        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=SELECT * FROM Customer WHERE DisplayName = '${escapedName}'`,
+        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -875,7 +879,7 @@ export class QuickBooksService {
 
       // If exact match fails, try to get all customers and find by DisplayName
       const allCustomersResponse = await axios.get(
-        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=SELECT * FROM Customer`,
+        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer')}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -935,8 +939,9 @@ export class QuickBooksService {
 
       console.log(`Searching for customer with exact name: "${customerName}"`);
 
+      const custNameQuery = `SELECT * FROM Customer WHERE Name = '${escapedName}'`;
       const response = await axios.get(
-        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=SELECT * FROM Customer WHERE Name = '${escapedName}'`,
+        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=${encodeURIComponent(custNameQuery)}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -955,7 +960,7 @@ export class QuickBooksService {
 
       // If exact match fails, try to get all customers and find by name
       const allCustomersResponse = await axios.get(
-        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=SELECT * FROM Customer`,
+        `${this.getBaseUrl()}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer')}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
