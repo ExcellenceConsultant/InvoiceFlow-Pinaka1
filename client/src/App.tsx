@@ -12,6 +12,7 @@ import Orders from "@/pages/orders";
 import InvoiceView from "@/pages/invoice-view";
 import PackingList from "@/pages/packing-list";
 import OrderPackingSlip from "@/pages/order-packing-slip";
+import PurchaseOrderView from "@/pages/purchase-order-view";
 import ShippingLabel from "@/pages/shipping-label";
 import CreditMemos from "@/pages/credit-memos";
 import CreditMemoView from "@/pages/credit-memo-view";
@@ -50,6 +51,7 @@ function Router() {
   const isCreditMemoView =
     location.startsWith("/credit-memos/") && location !== "/credit-memos";
   const isOrderPackingSlip = location.includes("/packing-slip");
+  const isPurchaseOrderView = location.includes("/purchase-order-view");
 
   // Show loading state
   if (isLoading) {
@@ -58,7 +60,7 @@ function Router() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted to-secondary/20">
-      {isAuthenticated && !isInvoiceView && !isCreditMemoView && !isOrderPackingSlip && <Navbar />}
+      {isAuthenticated && !isInvoiceView && !isCreditMemoView && !isOrderPackingSlip && !isPurchaseOrderView && <Navbar />}
       <Switch>
         <Route path="/login">
           {isAuthenticated ? <Dashboard /> : <Login />}
@@ -72,6 +74,9 @@ function Router() {
         </Route>
         <Route path="/orders/:id/packing-slip">
           {(params) => <ProtectedRoute component={OrderPackingSlip} {...params} />}
+        </Route>
+        <Route path="/orders/:id/purchase-order-view">
+          {(params) => <ProtectedRoute component={PurchaseOrderView} {...params} />}
         </Route>
         <Route path="/invoices/:id">
           {(params) => <ProtectedRoute component={InvoiceView} {...params} />}

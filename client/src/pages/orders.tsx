@@ -607,6 +607,18 @@ export default function Orders() {
                                 </Button>
                               </Link>
                             )}
+                            {order.orderType === "purchase" && (order.status === "approved" || order.status === "finalized" || order.isConverted) && (
+                              <Link href={`/orders/${order.id}/purchase-order-view`}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="View Purchase Order"
+                                  data-testid={`button-view-po-${order.id}`}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            )}
                             {(order.status === "approved" || order.status === "finalized") && !order.isConverted && (
                               order.orderType === "sales" ? (
                                 permissions.canSendSalesOrderToInvoice && (
