@@ -2724,24 +2724,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
 
               if (existingItem) {
-                // Update local product with existing QB item ID
+                existingItem = await quickBooksService.reactivateItemIfNeeded(
+                  validQbConfig.accessToken,
+                  validQbConfig.companyId,
+                  existingItem,
+                );
                 await storage.updateProduct(product.id, {
                   quickbooksItemId: existingItem.Id,
                 });
               } else {
-                // Create new item - use inventory type with SKU if item code exists
                 const qbItemData: any = {
                   Name: product.name,
                   Type: product.itemCode ? "Inventory" : "Service",
                 };
 
-                // Add SKU if item code exists
                 if (product.itemCode) {
                   qbItemData.Sku = product.itemCode;
-                  // For inventory items, we need to specify income and expense accounts
-                  qbItemData.IncomeAccountRef = { value: "79" }; // Sales of Product Income
-                  qbItemData.ExpenseAccountRef = { value: "80" }; // Cost of Goods Sold
-                  qbItemData.AssetAccountRef = { value: "81" }; // Inventory Asset
+                  qbItemData.IncomeAccountRef = { value: "79" };
+                  qbItemData.ExpenseAccountRef = { value: "80" };
+                  qbItemData.AssetAccountRef = { value: "81" };
                   qbItemData.TrackQtyOnHand = true;
                   qbItemData.QtyOnHand = 0;
                   qbItemData.InvStartDate = new Date()
@@ -2755,7 +2756,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   qbItemData,
                 );
 
-                // Update local product with QB item ID
                 await storage.updateProduct(product.id, {
                   quickbooksItemId: qbItem.Id,
                 });
@@ -2807,6 +2807,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (parseFloat(String(item.quantity)) <= 0) continue;
             const product = await storage.getProduct(item.productId);
             if (product && product.quickbooksItemId) {
+              await quickBooksService.ensureItemActiveById(
+                validQbConfig.accessToken,
+                validQbConfig.companyId,
+                product.quickbooksItemId,
+              );
               const qbAmount = Math.round(parseFloat(String(item.unitPrice)) * parseFloat(String(item.quantity)) * 100) / 100;
               qbLineItems.push({
                 Amount: qbAmount,
@@ -2897,6 +2902,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (parseFloat(String(item.quantity)) <= 0) continue;
             const product = await storage.getProduct(item.productId);
             if (product && product.quickbooksItemId) {
+              await quickBooksService.ensureItemActiveById(
+                validQbConfig.accessToken,
+                validQbConfig.companyId,
+                product.quickbooksItemId,
+              );
               const qbAmount = Math.round(parseFloat(String(item.unitPrice)) * parseFloat(String(item.quantity)) * 100) / 100;
               qbLineItems.push({
                 Amount: qbAmount,
@@ -3417,22 +3427,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         let qbItem;
         if (existingItem) {
-          // Use existing item
-          qbItem = existingItem;
+          qbItem = await quickBooksService.reactivateItemIfNeeded(
+            validQbConfig.accessToken,
+            validQbConfig.companyId,
+            existingItem,
+          );
         } else {
-          // Create new item - use inventory type with SKU if item code exists
           const qbItemData: any = {
             Name: product.name,
             Type: product.itemCode ? "Inventory" : "Service",
           };
 
-          // Add SKU if item code exists
           if (product.itemCode) {
             qbItemData.Sku = product.itemCode;
-            // For inventory items, we need to specify income and expense accounts
-            qbItemData.IncomeAccountRef = { value: "79" }; // Sales of Product Income
-            qbItemData.ExpenseAccountRef = { value: "80" }; // Cost of Goods Sold
-            qbItemData.AssetAccountRef = { value: "81" }; // Inventory Asset
+            qbItemData.IncomeAccountRef = { value: "79" };
+            qbItemData.ExpenseAccountRef = { value: "80" };
+            qbItemData.AssetAccountRef = { value: "81" };
             qbItemData.TrackQtyOnHand = true;
             qbItemData.QtyOnHand = 0;
             qbItemData.InvStartDate = new Date().toISOString().split("T")[0];
@@ -3568,24 +3578,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
 
               if (existingItem) {
-                // Update local product with existing QB item ID
+                existingItem = await quickBooksService.reactivateItemIfNeeded(
+                  validQbConfig.accessToken,
+                  validQbConfig.companyId,
+                  existingItem,
+                );
                 await storage.updateProduct(product.id, {
                   quickbooksItemId: existingItem.Id,
                 });
               } else {
-                // Create new item - use inventory type with SKU if item code exists
                 const qbItemData: any = {
                   Name: product.name,
                   Type: product.itemCode ? "Inventory" : "Service",
                 };
 
-                // Add SKU if item code exists
                 if (product.itemCode) {
                   qbItemData.Sku = product.itemCode;
-                  // For inventory items, we need to specify income and expense accounts
-                  qbItemData.IncomeAccountRef = { value: "79" }; // Sales of Product Income
-                  qbItemData.ExpenseAccountRef = { value: "80" }; // Cost of Goods Sold
-                  qbItemData.AssetAccountRef = { value: "81" }; // Inventory Asset
+                  qbItemData.IncomeAccountRef = { value: "79" };
+                  qbItemData.ExpenseAccountRef = { value: "80" };
+                  qbItemData.AssetAccountRef = { value: "81" };
                   qbItemData.TrackQtyOnHand = true;
                   qbItemData.QtyOnHand = 0;
                   qbItemData.InvStartDate = new Date()
@@ -3599,7 +3610,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   qbItemData,
                 );
 
-                // Update local product with QB item ID
                 await storage.updateProduct(product.id, {
                   quickbooksItemId: qbItem.Id,
                 });
@@ -3683,6 +3693,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (parseFloat(String(item.quantity)) <= 0) continue;
             const product = await storage.getProduct(item.productId);
             if (product && product.quickbooksItemId) {
+              await quickBooksService.ensureItemActiveById(
+                validQbConfig.accessToken,
+                validQbConfig.companyId,
+                product.quickbooksItemId,
+              );
               const lineItemDetail: any = {
                 ItemRef: {
                   value: product.quickbooksItemId,
@@ -3780,6 +3795,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (parseFloat(String(item.quantity)) <= 0) continue;
             const product = await storage.getProduct(item.productId);
             if (product && product.quickbooksItemId) {
+              await quickBooksService.ensureItemActiveById(
+                validQbConfig.accessToken,
+                validQbConfig.companyId,
+                product.quickbooksItemId,
+              );
               const qbAmount = Math.round(parseFloat(item.unitPrice) * parseFloat(String(item.quantity)) * 100) / 100;
               qbLineItems.push({
                 Amount: qbAmount,

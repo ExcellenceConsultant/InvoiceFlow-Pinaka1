@@ -804,6 +804,86 @@ export class QuickBooksService {
     }
   }
 
+  async updateItem(
+    accessToken: string,
+    companyId: string,
+    itemData: any,
+  ): Promise<any> {
+    try {
+      const response = await axios.post(
+        `${this.getBaseUrl()}/v3/company/${companyId}/item`,
+        itemData,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        },
+      );
+
+      return response.data.QueryResponse?.Item?.[0] || response.data.Item;
+    } catch (error: any) {
+      console.error(
+        "QuickBooks item update failed:",
+        error.response?.data || error.message,
+      );
+      throw error;
+    }
+  }
+
+  async getItemById(
+    accessToken: string,
+    companyId: string,
+    itemId: string,
+  ): Promise<any> {
+    try {
+      const response = await axios.get(
+        `${this.getBaseUrl()}/v3/company/${companyId}/item/${itemId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: "application/json",
+          },
+        },
+      );
+      return response.data.Item || null;
+    } catch (error: any) {
+      console.error(`Failed to fetch QB item ${itemId}:`, error.response?.data || error.message);
+      return null;
+    }
+  }
+
+  async reactivateItemIfNeeded(
+    accessToken: string,
+    companyId: string,
+    item: any,
+  ): Promise<any> {
+    if (item.Active === false) {
+      console.log(`Reactivating inactive QB item: ${item.Name} (Id: ${item.Id})`);
+      const updatedItem = await this.updateItem(accessToken, companyId, {
+        Id: item.Id,
+        SyncToken: item.SyncToken,
+        Active: true,
+        sparse: true,
+      });
+      console.log(`Successfully reactivated QB item: ${item.Name}`);
+      return updatedItem;
+    }
+    return item;
+  }
+
+  async ensureItemActiveById(
+    accessToken: string,
+    companyId: string,
+    itemId: string,
+  ): Promise<void> {
+    const item = await this.getItemById(accessToken, companyId, itemId);
+    if (item) {
+      await this.reactivateItemIfNeeded(accessToken, companyId, item);
+    }
+  }
+
   async getAccounts(accessToken: string, companyId: string): Promise<any> {
     try {
       const allAccounts: any[] = [];
