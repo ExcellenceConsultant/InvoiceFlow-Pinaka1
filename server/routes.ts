@@ -3900,11 +3900,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       DisplayName: trimmedName,
     };
 
-    qbCustomer = await quickBooksService.createCustomer(
-      qbConfig.accessToken,
-      qbConfig.companyId,
-      qbCustomerData,
-    );
+    try {
+      qbCustomer = await quickBooksService.createCustomer(
+        qbConfig.accessToken,
+        qbConfig.companyId,
+        qbCustomerData,
+      );
+    } catch (createError: any) {
+      const qbFault = createError.response?.data?.Fault?.Error?.[0];
+      if (qbFault?.code === "6240") {
+        const existingId = qbFault.Detail?.match(/Id=(\d+)/)?.[1];
+        if (existingId) {
+          console.log(`Name "${trimmedName}" already exists in QB as Id=${existingId}, using existing entity`);
+          qbCustomer = { Id: existingId, DisplayName: trimmedName };
+        } else {
+          throw createError;
+        }
+      } else {
+        throw createError;
+      }
+    }
 
     // Update local customer record with QuickBooks ID
     await storage.updateCustomer(customerId, {
@@ -3951,11 +3966,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       DisplayName: trimmedName,
     };
 
-    qbVendor = await quickBooksService.createVendor(
-      qbConfig.accessToken,
-      qbConfig.companyId,
-      qbVendorData,
-    );
+    try {
+      qbVendor = await quickBooksService.createVendor(
+        qbConfig.accessToken,
+        qbConfig.companyId,
+        qbVendorData,
+      );
+    } catch (createError: any) {
+      const qbFault = createError.response?.data?.Fault?.Error?.[0];
+      if (qbFault?.code === "6240") {
+        const existingId = qbFault.Detail?.match(/Id=(\d+)/)?.[1];
+        if (existingId) {
+          console.log(`Name "${trimmedName}" already exists in QB as Id=${existingId}, using existing entity`);
+          qbVendor = { Id: existingId, DisplayName: trimmedName };
+        } else {
+          throw createError;
+        }
+      } else {
+        throw createError;
+      }
+    }
 
     // Update local customer record with QuickBooks Vendor ID (for AP invoices, customer record holds vendor info)
     await storage.updateCustomer(customerId, {
