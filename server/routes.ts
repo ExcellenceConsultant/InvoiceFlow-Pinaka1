@@ -2807,8 +2807,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (parseFloat(String(item.quantity)) <= 0) continue;
             const product = await storage.getProduct(item.productId);
             if (product && product.quickbooksItemId) {
+              const qbAmount = Math.round(parseFloat(String(item.unitPrice)) * parseFloat(String(item.quantity)) * 100) / 100;
               qbLineItems.push({
-                Amount: parseFloat(String(item.lineTotal)),
+                Amount: qbAmount,
                 DetailType: "SalesItemLineDetail",
                 SalesItemLineDetail: {
                   ItemRef: {
@@ -2896,8 +2897,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (parseFloat(String(item.quantity)) <= 0) continue;
             const product = await storage.getProduct(item.productId);
             if (product && product.quickbooksItemId) {
+              const qbAmount = Math.round(parseFloat(String(item.unitPrice)) * parseFloat(String(item.quantity)) * 100) / 100;
               qbLineItems.push({
-                Amount: parseFloat(String(item.lineTotal)),
+                Amount: qbAmount,
                 DetailType: "ItemBasedExpenseLineDetail",
                 ItemBasedExpenseLineDetail: {
                   ItemRef: {
@@ -3710,8 +3712,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               // If no qbTaxCodeId is available at all, QB will use its default (less ideal but sync won't fail)
 
+              const qbAmount = Math.round(parseFloat(item.unitPrice) * parseFloat(String(item.quantity)) * 100) / 100;
               qbLineItems.push({
-                Amount: parseFloat(item.lineTotal),
+                Amount: qbAmount,
                 DetailType: "SalesItemLineDetail",
                 SalesItemLineDetail: lineItemDetail,
               });
@@ -3777,8 +3780,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (parseFloat(String(item.quantity)) <= 0) continue;
             const product = await storage.getProduct(item.productId);
             if (product && product.quickbooksItemId) {
+              const qbAmount = Math.round(parseFloat(item.unitPrice) * parseFloat(String(item.quantity)) * 100) / 100;
               qbLineItems.push({
-                Amount: parseFloat(item.lineTotal),
+                Amount: qbAmount,
                 DetailType: "ItemBasedExpenseLineDetail",
                 ItemBasedExpenseLineDetail: {
                   ItemRef: {
