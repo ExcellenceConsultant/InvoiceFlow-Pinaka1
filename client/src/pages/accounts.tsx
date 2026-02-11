@@ -1,26 +1,39 @@
 import CustomerVendorForm from "@/components/customer-vendor-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatCurrency } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Building,
   Download,
   Edit,
   FileText,
+  Filter,
   Package,
   Plus,
   Power,
+  Search,
   Trash2,
   Upload,
   User,
   Users,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 export default function Accounts() {
   const permissions = usePermissions();
@@ -29,6 +42,13 @@ export default function Accounts() {
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [customerCategoryFilter, setCustomerCategoryFilter] = useState("all");
+  const [customerSortField, setCustomerSortField] = useState<"name" | "email" | "phone" | "status" | "openBalance" | null>(null);
+  const [customerSortDir, setCustomerSortDir] = useState<"asc" | "desc">("asc");
+  const [vendorSortField, setVendorSortField] = useState<"name" | "email" | "phone" | "status" | "openBalance" | null>(null);
+  const [vendorSortDir, setVendorSortDir] = useState<"asc" | "desc">("asc");
   const customerFileInputRef = useRef<HTMLInputElement>(null);
   const vendorFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -151,6 +171,104 @@ export default function Accounts() {
     const totalValue = invoiceTotal - creditMemoTotal;
     return Math.max(0, totalValue); // Ensure non-negative balance for display
   };
+
+  const customerCategories = useMemo(() => {
+    const cats = customerList
+      .map((c: any) => c.customerCategory)
+      .filter((cat: any) => cat && cat.trim() !== "");
+    return Array.from(new Set(cats)) as string[];
+  }, [customerList]);
+
+  const filteredCustomerList = useMemo(() => {
+    let list = [...customerList];
+    const searchLower = customerSearch.toLowerCase().trim();
+    if (searchLower) {
+      list = list.filter((c: any) =>
+        (c.name || "").toLowerCase().includes(searchLower) ||
+        (c.email || "").toLowerCase().includes(searchLower) ||
+        (c.phone || "").toLowerCase().includes(searchLower)
+      );
+    }
+    if (customerCategoryFilter !== "all") {
+      list = list.filter((c: any) => c.customerCategory === customerCategoryFilter);
+    }
+    if (customerSortField) {
+      list.sort((a: any, b: any) => {
+        let aVal: any, bVal: any;
+        if (customerSortField === "openBalance") {
+          aVal = getOpenBalanceValue(a.id, "customer");
+          bVal = getOpenBalanceValue(b.id, "customer");
+        } else if (customerSortField === "status") {
+          aVal = a.isActive !== false ? "Active" : "Inactive";
+          bVal = b.isActive !== false ? "Active" : "Inactive";
+        } else {
+          aVal = (a[customerSortField] || "").toLowerCase();
+          bVal = (b[customerSortField] || "").toLowerCase();
+        }
+        if (aVal < bVal) return customerSortDir === "asc" ? -1 : 1;
+        if (aVal > bVal) return customerSortDir === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+    return list;
+  }, [customerList, customerSearch, customerCategoryFilter, customerSortField, customerSortDir, invoices, creditMemos]);
+
+  const filteredVendorList = useMemo(() => {
+    let list = [...vendorList];
+    const searchLower = vendorSearch.toLowerCase().trim();
+    if (searchLower) {
+      list = list.filter((v: any) =>
+        (v.name || "").toLowerCase().includes(searchLower) ||
+        (v.email || "").toLowerCase().includes(searchLower) ||
+        (v.phone || "").toLowerCase().includes(searchLower)
+      );
+    }
+    if (vendorSortField) {
+      list.sort((a: any, b: any) => {
+        let aVal: any, bVal: any;
+        if (vendorSortField === "openBalance") {
+          aVal = getOpenBalanceValue(a.id, "vendor");
+          bVal = getOpenBalanceValue(b.id, "vendor");
+        } else if (vendorSortField === "status") {
+          aVal = a.isActive !== false ? "Active" : "Inactive";
+          bVal = b.isActive !== false ? "Active" : "Inactive";
+        } else {
+          aVal = (a[vendorSortField] || "").toLowerCase();
+          bVal = (b[vendorSortField] || "").toLowerCase();
+        }
+        if (aVal < bVal) return vendorSortDir === "asc" ? -1 : 1;
+        if (aVal > bVal) return vendorSortDir === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+    return list;
+  }, [vendorList, vendorSearch, vendorSortField, vendorSortDir, invoices, creditMemos]);
+
+  const handleCustomerSort = (field: "name" | "email" | "phone" | "status" | "openBalance") => {
+    if (customerSortField === field) {
+      setCustomerSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setCustomerSortField(field);
+      setCustomerSortDir("asc");
+    }
+  };
+
+  const handleVendorSort = (field: "name" | "email" | "phone" | "status" | "openBalance") => {
+    if (vendorSortField === field) {
+      setVendorSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setVendorSortField(field);
+      setVendorSortDir("asc");
+    }
+  };
+
+  const SortIcon = ({ field, currentField, currentDir }: { field: string; currentField: string | null; currentDir: "asc" | "desc" }) => {
+    if (currentField !== field) return <ArrowUpDown size={14} className="ml-1 text-muted-foreground/50" />;
+    return currentDir === "asc" ? <ArrowUp size={14} className="ml-1" /> : <ArrowDown size={14} className="ml-1" />;
+  };
+
+  const isCustomerFiltered = customerSearch.trim() !== "" || customerCategoryFilter !== "all";
+  const isVendorFiltered = vendorSearch.trim() !== "";
 
   // Export customers handler
   const handleExportCustomers = async () => {
@@ -500,10 +618,11 @@ export default function Accounts() {
   };
 
   const handleSelectAllCustomers = () => {
-    if (selectedCustomers.length === customerList.length) {
-      setSelectedCustomers([]);
+    const visibleIds = filteredCustomerList.map((c: any) => c.id);
+    if (visibleIds.every((id: string) => selectedCustomers.includes(id))) {
+      setSelectedCustomers(prev => prev.filter(id => !visibleIds.includes(id)));
     } else {
-      setSelectedCustomers(customerList.map((c: any) => c.id));
+      setSelectedCustomers(prev => Array.from(new Set([...prev, ...visibleIds])));
     }
   };
 
@@ -525,10 +644,11 @@ export default function Accounts() {
   };
 
   const handleSelectAllVendors = () => {
-    if (selectedVendors.length === vendorList.length) {
-      setSelectedVendors([]);
+    const visibleIds = filteredVendorList.map((v: any) => v.id);
+    if (visibleIds.every((id: string) => selectedVendors.includes(id))) {
+      setSelectedVendors(prev => prev.filter(id => !visibleIds.includes(id)));
     } else {
-      setSelectedVendors(vendorList.map((v: any) => v.id));
+      setSelectedVendors(prev => Array.from(new Set([...prev, ...visibleIds])));
     }
   };
 
@@ -599,7 +719,7 @@ export default function Accounts() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="flex items-center">
                   <Users className="mr-2 text-primary" size={20} />
-                  Customers ({customerList.length})
+                  Customers ({isCustomerFiltered ? `${filteredCustomerList.length} of ${customerList.length}` : customerList.length})
                 </CardTitle>
                 <div className="flex items-center space-x-2">
                   <Button
@@ -670,6 +790,35 @@ export default function Accounts() {
                   ))}
                 </div>
               ) : customerList.length > 0 ? (
+                <>
+                <div className="flex items-center gap-3 mb-4 flex-wrap">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                    <Input
+                      placeholder="Search by name, email, or phone..."
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-customer-search"
+                    />
+                  </div>
+                  {customerCategories.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Filter size={16} className="text-muted-foreground" />
+                      <Select value={customerCategoryFilter} onValueChange={setCustomerCategoryFilter}>
+                        <SelectTrigger className="w-[180px]" data-testid="select-customer-category">
+                          <SelectValue placeholder="All Categories" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Categories</SelectItem>
+                          {customerCategories.map((cat) => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -678,8 +827,8 @@ export default function Accounts() {
                           <input
                             type="checkbox"
                             checked={
-                              customerList.length > 0 &&
-                              selectedCustomers.length === customerList.length
+                              filteredCustomerList.length > 0 &&
+                              filteredCustomerList.every((c: any) => selectedCustomers.includes(c.id))
                             }
                             onChange={handleSelectAllCustomers}
                             className="w-4 h-4 cursor-pointer"
@@ -687,19 +836,29 @@ export default function Accounts() {
                           />
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                          Name
+                          <span className="flex items-center cursor-pointer select-none" onClick={() => handleCustomerSort("name")} data-testid="sort-customer-name">
+                            Name <SortIcon field="name" currentField={customerSortField} currentDir={customerSortDir} />
+                          </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                          Email
+                          <span className="flex items-center cursor-pointer select-none" onClick={() => handleCustomerSort("email")} data-testid="sort-customer-email">
+                            Email <SortIcon field="email" currentField={customerSortField} currentDir={customerSortDir} />
+                          </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                          Phone
+                          <span className="flex items-center cursor-pointer select-none" onClick={() => handleCustomerSort("phone")} data-testid="sort-customer-phone">
+                            Phone <SortIcon field="phone" currentField={customerSortField} currentDir={customerSortDir} />
+                          </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                          Status
+                          <span className="flex items-center cursor-pointer select-none" onClick={() => handleCustomerSort("status")} data-testid="sort-customer-status">
+                            Status <SortIcon field="status" currentField={customerSortField} currentDir={customerSortDir} />
+                          </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                          Open Balance
+                          <span className="flex items-center cursor-pointer select-none" onClick={() => handleCustomerSort("openBalance")} data-testid="sort-customer-openBalance">
+                            Open Balance <SortIcon field="openBalance" currentField={customerSortField} currentDir={customerSortDir} />
+                          </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
                           Actions
@@ -707,7 +866,7 @@ export default function Accounts() {
                       </tr>
                     </thead>
                     <tbody>
-                      {customerList.map((customer: any) => (
+                      {filteredCustomerList.map((customer: any) => (
                         <tr
                           key={customer.id}
                           className="border-b border-border hover:bg-muted/20 transition-colors"
@@ -816,6 +975,12 @@ export default function Accounts() {
                     </tbody>
                   </table>
                 </div>
+                {filteredCustomerList.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground" data-testid="text-no-customer-results">
+                    No customers match your search criteria.
+                  </div>
+                )}
+                </>
               ) : (
                 <div className="text-center py-12">
                   <Users className="mx-auto h-12 w-12 text-muted-foreground/50" />
@@ -953,7 +1118,7 @@ export default function Accounts() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="flex items-center">
                   <Building className="mr-2 text-primary" size={20} />
-                  Vendors ({vendorList.length})
+                  Vendors ({isVendorFiltered ? `${filteredVendorList.length} of ${vendorList.length}` : vendorList.length})
                 </CardTitle>
                 <div className="flex items-center space-x-2">
                   <Button
@@ -1024,6 +1189,19 @@ export default function Accounts() {
                   ))}
                 </div>
               ) : vendorList.length > 0 ? (
+                <>
+                <div className="flex items-center gap-3 mb-4 flex-wrap">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                    <Input
+                      placeholder="Search by name, email, or phone..."
+                      value={vendorSearch}
+                      onChange={(e) => setVendorSearch(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-vendor-search"
+                    />
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -1032,8 +1210,8 @@ export default function Accounts() {
                           <input
                             type="checkbox"
                             checked={
-                              vendorList.length > 0 &&
-                              selectedVendors.length === vendorList.length
+                              filteredVendorList.length > 0 &&
+                              filteredVendorList.every((v: any) => selectedVendors.includes(v.id))
                             }
                             onChange={handleSelectAllVendors}
                             className="w-4 h-4 cursor-pointer"
@@ -1041,19 +1219,29 @@ export default function Accounts() {
                           />
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                          Name
+                          <span className="flex items-center cursor-pointer select-none" onClick={() => handleVendorSort("name")} data-testid="sort-vendor-name">
+                            Name <SortIcon field="name" currentField={vendorSortField} currentDir={vendorSortDir} />
+                          </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                          Email
+                          <span className="flex items-center cursor-pointer select-none" onClick={() => handleVendorSort("email")} data-testid="sort-vendor-email">
+                            Email <SortIcon field="email" currentField={vendorSortField} currentDir={vendorSortDir} />
+                          </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                          Phone
+                          <span className="flex items-center cursor-pointer select-none" onClick={() => handleVendorSort("phone")} data-testid="sort-vendor-phone">
+                            Phone <SortIcon field="phone" currentField={vendorSortField} currentDir={vendorSortDir} />
+                          </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                          Status
+                          <span className="flex items-center cursor-pointer select-none" onClick={() => handleVendorSort("status")} data-testid="sort-vendor-status">
+                            Status <SortIcon field="status" currentField={vendorSortField} currentDir={vendorSortDir} />
+                          </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                          Open Balance
+                          <span className="flex items-center cursor-pointer select-none" onClick={() => handleVendorSort("openBalance")} data-testid="sort-vendor-openBalance">
+                            Open Balance <SortIcon field="openBalance" currentField={vendorSortField} currentDir={vendorSortDir} />
+                          </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
                           Actions
@@ -1061,7 +1249,7 @@ export default function Accounts() {
                       </tr>
                     </thead>
                     <tbody>
-                      {vendorList.map((vendor: any) => (
+                      {filteredVendorList.map((vendor: any) => (
                         <tr
                           key={vendor.id}
                           className="border-b border-border hover:bg-muted/20 transition-colors"
@@ -1170,6 +1358,12 @@ export default function Accounts() {
                     </tbody>
                   </table>
                 </div>
+                {filteredVendorList.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground" data-testid="text-no-vendor-results">
+                    No vendors match your search criteria.
+                  </div>
+                )}
+                </>
               ) : (
                 <div className="text-center py-12">
                   <Building className="mx-auto h-12 w-12 text-muted-foreground/50" />
