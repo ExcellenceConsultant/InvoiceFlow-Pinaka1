@@ -3885,6 +3885,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           Id: qbCustomer.Id,
           DisplayName: qbCustomer.DisplayName,
         });
+        // Update local record
+        await storage.updateCustomer(customerId, {
+          quickbooksCustomerId: qbCustomer.Id,
+        });
         return qbCustomer;
       }
     } catch (lookupError: any) {
@@ -3909,12 +3913,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (createError: any) {
       const qbFault = createError.response?.data?.Fault?.Error?.[0];
       if (qbFault?.code === "6240") {
+        // Name already exists - could be a Vendor/Employee with the same name
+        // QB doesn't allow same DisplayName across entity types
+        // Try reading the entity as a Customer by ID first
         const existingId = qbFault.Detail?.match(/Id=(\d+)/)?.[1];
-        if (existingId) {
-          console.log(`Name "${trimmedName}" already exists in QB as Id=${existingId}, using existing entity`);
-          qbCustomer = { Id: existingId, DisplayName: trimmedName };
-        } else {
-          throw createError;
+        console.log(`Name "${trimmedName}" already exists in QB (Id=${existingId}). Checking if it exists as a Customer...`);
+        
+        // The name might exist as a Vendor. Try to read it as Customer by querying again
+        // If it's truly a different entity type, we need to use a slightly different name
+        const qbBaseUrl = process.env.QUICKBOOKS_ENVIRONMENT === "production"
+          ? "https://quickbooks.api.intuit.com"
+          : "https://sandbox-quickbooks.api.intuit.com";
+        
+        try {
+          // Check if a Customer with this exact ID exists
+          if (existingId) {
+            const checkResponse = await axios.get(
+              `${qbBaseUrl}/v3/company/${qbConfig.companyId}/customer/${existingId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${qbConfig.accessToken}`,
+                  Accept: "application/json",
+                },
+              },
+            );
+            if (checkResponse.data?.Customer) {
+              console.log(`Id=${existingId} IS a Customer, using it`);
+              qbCustomer = checkResponse.data.Customer;
+            }
+          }
+        } catch (readErr: any) {
+          // Id is not a Customer (likely a Vendor/Employee)
+          console.log(`Id=${existingId} is NOT a Customer. Name conflict with another entity type.`);
+        }
+        
+        if (!qbCustomer) {
+          // Name exists as a different entity type - try to find any existing Customer with similar name
+          try {
+            const searchResp = await axios.get(
+              `${qbBaseUrl}/v3/company/${qbConfig.companyId}/query?query=SELECT * FROM Customer WHERE DisplayName LIKE '${trimmedName.replace(/'/g, "''")}%'`,
+              {
+                headers: {
+                  Authorization: `Bearer ${qbConfig.accessToken}`,
+                  Accept: "application/json",
+                },
+              },
+            );
+            const matches = searchResp.data?.QueryResponse?.Customer || [];
+            if (matches.length > 0) {
+              console.log(`Found existing customer with similar name: ${matches[0].DisplayName}`);
+              qbCustomer = matches[0];
+            }
+          } catch (searchErr: any) {
+            console.log("Similar name search failed:", searchErr.message);
+          }
+        }
+        
+        if (!qbCustomer) {
+          // Last resort: create customer with "(Customer)" suffix
+          const altName = `${trimmedName} (Customer)`;
+          console.log(`Creating customer with alternate name: "${altName}"`);
+          try {
+            qbCustomer = await quickBooksService.createCustomer(
+              qbConfig.accessToken,
+              qbConfig.companyId,
+              { DisplayName: altName },
+            );
+          } catch (altError: any) {
+            // Even alternate name failed - maybe it already exists
+            const altFault = altError.response?.data?.Fault?.Error?.[0];
+            if (altFault?.code === "6240") {
+              const altId = altFault.Detail?.match(/Id=(\d+)/)?.[1];
+              if (altId) {
+                qbCustomer = { Id: altId, DisplayName: altName };
+              } else {
+                throw createError;
+              }
+            } else {
+              throw altError;
+            }
+          }
         }
       } else {
         throw createError;
@@ -3976,11 +4054,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const qbFault = createError.response?.data?.Fault?.Error?.[0];
       if (qbFault?.code === "6240") {
         const existingId = qbFault.Detail?.match(/Id=(\d+)/)?.[1];
-        if (existingId) {
-          console.log(`Name "${trimmedName}" already exists in QB as Id=${existingId}, using existing entity`);
-          qbVendor = { Id: existingId, DisplayName: trimmedName };
-        } else {
-          throw createError;
+        console.log(`Name "${trimmedName}" already exists in QB (Id=${existingId}). Checking if it exists as a Vendor...`);
+        
+        const qbBaseUrl = process.env.QUICKBOOKS_ENVIRONMENT === "production"
+          ? "https://quickbooks.api.intuit.com"
+          : "https://sandbox-quickbooks.api.intuit.com";
+        
+        // Try to read entity as Vendor by ID
+        try {
+          if (existingId) {
+            const checkResponse = await axios.get(
+              `${qbBaseUrl}/v3/company/${qbConfig.companyId}/vendor/${existingId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${qbConfig.accessToken}`,
+                  Accept: "application/json",
+                },
+              },
+            );
+            if (checkResponse.data?.Vendor) {
+              console.log(`Id=${existingId} IS a Vendor, using it`);
+              qbVendor = checkResponse.data.Vendor;
+            }
+          }
+        } catch (readErr: any) {
+          console.log(`Id=${existingId} is NOT a Vendor. Name conflict with another entity type.`);
+        }
+        
+        if (!qbVendor) {
+          // Try broader search for existing vendor with similar name
+          try {
+            const searchResp = await axios.get(
+              `${qbBaseUrl}/v3/company/${qbConfig.companyId}/query?query=SELECT * FROM Vendor WHERE DisplayName LIKE '${trimmedName.replace(/'/g, "''")}%'`,
+              {
+                headers: {
+                  Authorization: `Bearer ${qbConfig.accessToken}`,
+                  Accept: "application/json",
+                },
+              },
+            );
+            const matches = searchResp.data?.QueryResponse?.Vendor || [];
+            if (matches.length > 0) {
+              console.log(`Found existing vendor with similar name: ${matches[0].DisplayName}`);
+              qbVendor = matches[0];
+            }
+          } catch (searchErr: any) {
+            console.log("Similar vendor name search failed:", searchErr.message);
+          }
+        }
+        
+        if (!qbVendor) {
+          // Last resort: create vendor with "(Vendor)" suffix
+          const altName = `${trimmedName} (Vendor)`;
+          console.log(`Creating vendor with alternate name: "${altName}"`);
+          try {
+            qbVendor = await quickBooksService.createVendor(
+              qbConfig.accessToken,
+              qbConfig.companyId,
+              { DisplayName: altName },
+            );
+          } catch (altError: any) {
+            const altFault = altError.response?.data?.Fault?.Error?.[0];
+            if (altFault?.code === "6240") {
+              const altId = altFault.Detail?.match(/Id=(\d+)/)?.[1];
+              if (altId) {
+                qbVendor = { Id: altId, DisplayName: altName };
+              } else {
+                throw createError;
+              }
+            } else {
+              throw altError;
+            }
+          }
         }
       } else {
         throw createError;
