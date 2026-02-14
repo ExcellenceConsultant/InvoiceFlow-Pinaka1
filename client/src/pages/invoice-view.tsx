@@ -717,7 +717,7 @@ function InvoiceView() {
             {/* Invoice Details */}
             <div className="info-section">
               <div className="info-detail">
-                <strong>Invoice No.</strong> : {invoice.invoiceNumber}
+                <span style={{ fontWeight: "bold", fontSize: "14px" }}>Invoice No. : {invoice.invoiceNumber}</span>
               </div>
               <div className="info-detail">
                 <strong>Invoice Date</strong> :{" "}
