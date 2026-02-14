@@ -927,7 +927,7 @@ function InvoiceView() {
                   </div>
                   <div>
                     <strong>Discount ({discountPercent.toFixed(2)}%):</strong>{" "}
-                    <span style={{ float: "right" }}>
+                    <span style={{ float: "right", fontWeight: "bold" }}>
                       -{formatCurrency(discountAmount)}
                     </span>
                   </div>
