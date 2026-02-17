@@ -682,31 +682,42 @@ function InvoiceView() {
             {/* Ship To */}
             <div className="info-section">
               <div className="info-label">SHIP TO:</div>
-              <div className="info-company">
-                {(invoice as any).shipToName ||
-                  (invoice as any).customer?.name ||
-                  "Client Company LLC"}
-              </div>
-              {shipAddress && (
+              {(invoice as any).invoiceType === "payable" ? (
                 <>
-                  {typeof shipAddress === "string" ? (
-                    <div className="info-detail">{shipAddress}</div>
-                  ) : (
+                  <div className="info-company">Pinaka Foods, Inc.</div>
+                  <div className="info-detail">140 Ethel Road West, Unit # H,</div>
+                  <div className="info-detail">Piscataway, NJ 08854</div>
+                  <div className="info-detail">USA</div>
+                </>
+              ) : (
+                <>
+                  <div className="info-company">
+                    {(invoice as any).shipToName ||
+                      (invoice as any).customer?.name ||
+                      "Client Company LLC"}
+                  </div>
+                  {shipAddress && (
                     <>
-                      {shipAddress.street && (
-                        <div className="info-detail">{shipAddress.street}</div>
-                      )}
-                      {shipAddress.city && (
-                        <div className="info-detail">
-                          {shipAddress.city}
-                          {shipAddress.state
-                            ? `, ${shipAddress.state}`
-                            : ""}{" "}
-                          {shipAddress.zipCode || ""}
-                        </div>
-                      )}
-                      {shipAddress.country && (
-                        <div className="info-detail">{shipAddress.country}</div>
+                      {typeof shipAddress === "string" ? (
+                        <div className="info-detail">{shipAddress}</div>
+                      ) : (
+                        <>
+                          {shipAddress.street && (
+                            <div className="info-detail">{shipAddress.street}</div>
+                          )}
+                          {shipAddress.city && (
+                            <div className="info-detail">
+                              {shipAddress.city}
+                              {shipAddress.state
+                                ? `, ${shipAddress.state}`
+                                : ""}{" "}
+                              {shipAddress.zipCode || ""}
+                            </div>
+                          )}
+                          {shipAddress.country && (
+                            <div className="info-detail">{shipAddress.country}</div>
+                          )}
+                        </>
                       )}
                     </>
                   )}

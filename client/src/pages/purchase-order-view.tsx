@@ -397,26 +397,10 @@ export default function PurchaseOrderView() {
 
             <div className="info-section">
               <div className="info-label">SHIP TO:</div>
-              <div className="info-company">
-                {vendor?.name || "—"}
-              </div>
-              {vendorAddress && (
-                <>
-                  {vendorAddress.street && (
-                    <div className="info-detail">{vendorAddress.street}</div>
-                  )}
-                  {vendorAddress.city && (
-                    <div className="info-detail">
-                      {vendorAddress.city}
-                      {vendorAddress.state ? `, ${vendorAddress.state}` : ""}{" "}
-                      {vendorAddress.zipCode || ""}
-                    </div>
-                  )}
-                  {vendorAddress.country && (
-                    <div className="info-detail">{vendorAddress.country}</div>
-                  )}
-                </>
-              )}
+              <div className="info-company">Pinaka Foods, Inc.</div>
+              <div className="info-detail">140 Ethel Road West, Unit # H,</div>
+              <div className="info-detail">Piscataway, NJ 08854</div>
+              <div className="info-detail">USA</div>
             </div>
 
             <div className="info-section">
