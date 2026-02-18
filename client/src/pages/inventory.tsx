@@ -375,7 +375,7 @@ export default function Inventory() {
   };
 
   // Get unique categories
-  const categories = Array.from(new Set(products?.map((p: any) => p.category).filter(Boolean))) || [];
+  const categories = (Array.from(new Set(products?.map((p: any) => p.category).filter(Boolean))) || []).sort((a: any, b: any) => a.localeCompare(b));
 
   // Generate Excel Report Function
   const generateInventoryReport = () => {
