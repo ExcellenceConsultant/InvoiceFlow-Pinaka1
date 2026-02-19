@@ -1,4 +1,6 @@
 import axios from "axios";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import {
   insertCreditMemoLineItemSchema,
   insertCreditMemoSchema,
@@ -1357,37 +1359,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/invoices/next-number", isAuthenticated, async (req, res) => {
     try {
-      const user = (req as any).user;
-      const invoices = await storage.getInvoices(user.userId);
-
-      // Filter for AR invoices only
-      const arInvoices = invoices.filter(
-        (inv) => inv.invoiceType === "receivable",
-      );
-
-      if (arInvoices.length === 0) {
-        // Start from 1 if no AR invoices exist
-        return res.json({ nextNumber: "1" });
-      }
-
-      // Extract numeric invoice numbers and find the maximum
-      const numericInvoiceNumbers = arInvoices
-        .map((inv) => {
-          const invoiceNumber = inv.invoiceNumber.trim();
-          // Remove any non-numeric characters and parse as number
-          const numericPart = invoiceNumber.replace(/\D/g, "");
-          return parseInt(numericPart, 10);
-        })
-        .filter((num) => !isNaN(num));
-
-      if (numericInvoiceNumbers.length === 0) {
-        // If no valid numeric invoice numbers found, start from 1
-        return res.json({ nextNumber: "1" });
-      }
-
-      const maxNumber = Math.max(...numericInvoiceNumbers);
-      const nextNumber = maxNumber + 1;
-
+      const result = await db.execute(sql`
+        SELECT COALESCE(
+          MAX(
+            CASE 
+              WHEN regexp_replace(invoice_number, '[^0-9]', '', 'g') ~ '^[0-9]+$'
+              THEN CAST(regexp_replace(invoice_number, '[^0-9]', '', 'g') AS INTEGER)
+              ELSE 0
+            END
+          ), 0
+        ) + 1 AS next_number
+        FROM invoices
+        WHERE invoice_type = 'receivable'
+      `);
+      const nextNumber = result.rows?.[0]?.next_number || 1;
       res.json({ nextNumber: nextNumber.toString() });
     } catch (error) {
       console.error("Error getting next invoice number:", error);
