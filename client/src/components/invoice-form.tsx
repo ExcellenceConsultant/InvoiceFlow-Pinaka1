@@ -936,7 +936,13 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                     <FormItem>
                       <FormLabel>{watchedInvoiceType === "payable" ? "Vendor" : "Customer"}</FormLabel>
                       <Select
-                        onValueChange={field.onChange}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          const selectedParty = customers?.find((c: any) => c.id === value);
+                          if (selectedParty?.contactPersonName) {
+                            form.setValue("purchaseOrder", selectedParty.contactPersonName);
+                          }
+                        }}
                         defaultValue={field.value}
                       >
                         <FormControl>
