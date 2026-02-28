@@ -435,7 +435,7 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {activeCustomers.map((customer: any) => (
+                          {[...activeCustomers].sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "")).map((customer: any) => (
                             <SelectItem key={customer.id} value={customer.id}>
                               {customer.name}
                             </SelectItem>

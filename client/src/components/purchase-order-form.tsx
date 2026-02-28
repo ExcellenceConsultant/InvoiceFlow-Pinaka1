@@ -387,7 +387,7 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {activeVendors.map((vendor: any) => (
+                          {[...activeVendors].sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "")).map((vendor: any) => (
                             <SelectItem key={vendor.id} value={vendor.id}>
                               {vendor.name}
                             </SelectItem>

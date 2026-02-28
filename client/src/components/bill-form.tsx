@@ -898,6 +898,7 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
                                 .toLowerCase()
                                 .includes(customerSearchTerm.toLowerCase()),
                             )
+                            .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
                             .map((party: any) => (
                               <SelectItem
                                 key={party.id}
