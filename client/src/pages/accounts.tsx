@@ -841,6 +841,12 @@ export default function Accounts() {
                           </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                          Contact Person
+                        </th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                          Category
+                        </th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
                           <span className="flex items-center cursor-pointer select-none" onClick={() => handleCustomerSort("email")} data-testid="sort-customer-email">
                             Email <SortIcon field="email" currentField={customerSortField} currentDir={customerSortDir} />
                           </span>
@@ -884,6 +890,12 @@ export default function Accounts() {
                           </td>
                           <td className="py-3 px-4 text-sm font-medium text-foreground">
                             {customer.name}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-muted-foreground">
+                            {customer.contactPersonName || "N/A"}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-muted-foreground">
+                            {customer.customerCategory || "N/A"}
                           </td>
                           <td className="py-3 px-4 text-sm text-muted-foreground">
                             {customer.email || "N/A"}
@@ -1224,6 +1236,12 @@ export default function Accounts() {
                           </span>
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                          Contact Person
+                        </th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                          Category
+                        </th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
                           <span className="flex items-center cursor-pointer select-none" onClick={() => handleVendorSort("email")} data-testid="sort-vendor-email">
                             Email <SortIcon field="email" currentField={vendorSortField} currentDir={vendorSortDir} />
                           </span>
@@ -1267,6 +1285,12 @@ export default function Accounts() {
                           </td>
                           <td className="py-3 px-4 text-sm font-medium text-foreground">
                             {vendor.name}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-muted-foreground">
+                            {vendor.contactPersonName || "N/A"}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-muted-foreground">
+                            {vendor.customerCategory || "N/A"}
                           </td>
                           <td className="py-3 px-4 text-sm text-muted-foreground">
                             {vendor.email || "N/A"}
