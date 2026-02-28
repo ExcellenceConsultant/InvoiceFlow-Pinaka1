@@ -522,8 +522,10 @@ export default function Inventory() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header + Stats + Filters - Sticky Panel */}
+      <div className="sticky top-14 z-20 bg-background pb-4 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-8 pt-6 shadow-sm">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground" data-testid="page-title">Inventory Management</h1>
@@ -661,7 +663,7 @@ export default function Inventory() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <Card className="stats-card" data-testid="stats-total-products">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -834,6 +836,7 @@ export default function Inventory() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {/* Inventory Table */}
       <Card data-testid="inventory-table-card">
