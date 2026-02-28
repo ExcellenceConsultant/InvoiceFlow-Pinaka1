@@ -15,7 +15,7 @@ import { ProductForm } from "@/components/product-form";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatCurrency } from "@/lib/utils";
 
-type SortKey = "name" | "qty" | "category" | null;
+type SortKey = "name" | "itemCode" | "qty" | "category" | null;
 type SortOrder = "asc" | "desc";
 
 export default function Inventory() {
@@ -123,6 +123,9 @@ export default function Inventory() {
         } else if (sortKey === "qty") {
           aVal = a.qty || 0;
           bVal = b.qty || 0;
+        } else if (sortKey === "itemCode") {
+          aVal = (a.itemCode || "").toLowerCase();
+          bVal = (b.itemCode || "").toLowerCase();
         } else if (sortKey === "category") {
           aVal = (a.category || "").toLowerCase();
           bVal = (b.category || "").toLowerCase();
@@ -901,7 +904,16 @@ export default function Inventory() {
                       </div>
                     </th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Item Code</th>
+                    <th 
+                      className="text-left py-3 px-4 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                      onClick={() => handleSort("itemCode")}
+                      data-testid="sort-item-code"
+                    >
+                      <div className="flex items-center">
+                        Item Code
+                        {getSortIcon("itemCode")}
+                      </div>
+                    </th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Packing Size</th>
                     <th 
                       className="text-left py-3 px-4 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
