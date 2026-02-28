@@ -996,8 +996,9 @@ export default function Business() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
+      {/* Header + Filters - Sticky Panel */}
+      <div className="sticky top-14 z-20 bg-background pb-4 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-8 pt-6 shadow-sm">
+      <div className="mb-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1
@@ -1143,6 +1144,7 @@ export default function Business() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {/* Invoices List */}
       <Tabs
