@@ -16,6 +16,7 @@ import { DEFAULT_USER_ID } from "@/lib/constants";
 
 const customerVendorSchema = z.object({
   name: z.string().min(1, "Name is required"),
+  contactPersonName: z.string().optional(),
   email: z.string().email("Please enter a valid email").optional().or(z.literal("")),
   phone: z.string().optional(),
   customerCategory: z.string().optional(),
@@ -44,6 +45,7 @@ export default function CustomerVendorForm({ onClose, onSuccess, type, customer 
     resolver: zodResolver(customerVendorSchema),
     defaultValues: {
       name: customer?.name || "",
+      contactPersonName: customer?.contactPersonName || "",
       email: customer?.email || "",
       phone: customer?.phone || "",
       customerCategory: customer?.customerCategory || "",
@@ -109,6 +111,7 @@ export default function CustomerVendorForm({ onClose, onSuccess, type, customer 
     // Clean up empty address fields
     const cleanedData = {
       ...data,
+      contactPersonName: data.contactPersonName || undefined,
       email: data.email || undefined,
       phone: data.phone || undefined,
       customerCategory: data.customerCategory || undefined,
@@ -160,6 +163,22 @@ export default function CustomerVendorForm({ onClose, onSuccess, type, customer 
                 
                 <FormField
                   control={form.control}
+                  name="contactPersonName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Person Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid={`input-${type}-contact-person`} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
@@ -171,9 +190,7 @@ export default function CustomerVendorForm({ onClose, onSuccess, type, customer 
                     </FormItem>
                   )}
                 />
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="phone"
