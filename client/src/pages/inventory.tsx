@@ -124,8 +124,8 @@ export default function Inventory() {
           aVal = a.qty || 0;
           bVal = b.qty || 0;
         } else if (sortKey === "itemCode") {
-          aVal = (a.itemCode || "").toLowerCase();
-          bVal = (b.itemCode || "").toLowerCase();
+          aVal = parseInt(a.itemCode || "0", 10) || 0;
+          bVal = parseInt(b.itemCode || "0", 10) || 0;
         } else if (sortKey === "category") {
           aVal = (a.category || "").toLowerCase();
           bVal = (b.category || "").toLowerCase();
