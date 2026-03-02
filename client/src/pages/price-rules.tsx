@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Pencil, Trash2, Settings, Package, Users, UserPlus } from "lucide-react";
@@ -29,6 +30,7 @@ export default function PriceRules() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("global");
   const [showForm, setShowForm] = useState(false);
+  const [showBatchForm, setShowBatchForm] = useState(false);
   const [editingRule, setEditingRule] = useState<PriceRuleData | null>(null);
 
   const [formRuleType, setFormRuleType] = useState("global");
@@ -40,6 +42,17 @@ export default function PriceRules() {
   const [formIsActive, setFormIsActive] = useState(true);
   const [formProductCategoryFilter, setFormProductCategoryFilter] = useState("");
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
+
+  const [batchSelectedCustomerIds, setBatchSelectedCustomerIds] = useState<Set<string>>(new Set());
+  const [batchSelectedCategoryNames, setBatchSelectedCategoryNames] = useState<Set<string>>(new Set());
+  const [batchSelectedProductIds, setBatchSelectedProductIds] = useState<Set<string>>(new Set());
+  const [batchMarginPercent, setBatchMarginPercent] = useState("");
+  const [batchIsActive, setBatchIsActive] = useState(true);
+  const [batchMatchMode, setBatchMatchMode] = useState<"customer" | "category">("customer");
+  const [batchCustomerSearch, setBatchCustomerSearch] = useState("");
+  const [batchProductSearch, setBatchProductSearch] = useState("");
+  const [batchProductCategoryFilter, setBatchProductCategoryFilter] = useState("");
+  const [batchCreating, setBatchCreating] = useState(false);
 
   const { data: rules = [], isLoading } = useQuery<PriceRuleData[]>({
     queryKey: ["/api/price-rules"],
@@ -53,9 +66,13 @@ export default function PriceRules() {
     queryKey: ["/api/products"],
   });
 
-  const activeCustomers = customers.filter((c: any) => c.type === "customer" && c.isActive !== false);
+  const activeCustomers = customers
+    .filter((c: any) => c.type === "customer" && c.isActive !== false)
+    .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
   const categories = Array.from(new Set(products.map((p: any) => p.category).filter(Boolean))).sort((a: any, b: any) => a.localeCompare(b));
-  const customerCategories = Array.from(new Set(customers.filter((c: any) => c.customerCategory).map((c: any) => c.customerCategory))).sort((a: any, b: any) => a.localeCompare(b));
+  const customerCategories = Array.from(new Set(
+    activeCustomers.filter((c: any) => c.customerCategory).map((c: any) => c.customerCategory)
+  )).sort((a: any, b: any) => a.localeCompare(b));
 
   const filteredFormProducts = formProductCategoryFilter && formProductCategoryFilter !== "all_categories"
     ? products.filter((p: any) => p.category === formProductCategoryFilter)
@@ -65,6 +82,27 @@ export default function PriceRules() {
   const productRules = rules.filter((r) => r.ruleType === "product");
   const customerRules = rules.filter((r) => r.ruleType === "customer");
   const customerProductRules = rules.filter((r) => r.ruleType === "customer_product");
+
+  const batchFilteredCustomers = activeCustomers.filter((c: any) =>
+    c.name.toLowerCase().includes(batchCustomerSearch.toLowerCase())
+  );
+  const batchFilteredCategories = customerCategories.filter((cat: any) =>
+    cat.toLowerCase().includes(batchCustomerSearch.toLowerCase())
+  );
+  const batchFilteredProducts = (batchProductCategoryFilter && batchProductCategoryFilter !== "all_categories"
+    ? products.filter((p: any) => p.category === batchProductCategoryFilter)
+    : products
+  )
+    .filter((p: any) => {
+      const searchLower = batchProductSearch.toLowerCase();
+      return (p.name || "").toLowerCase().includes(searchLower) ||
+        (p.itemCode || "").toLowerCase().includes(searchLower);
+    })
+    .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+
+  const batchRuleCount = batchMatchMode === "customer"
+    ? batchSelectedCustomerIds.size * batchSelectedProductIds.size
+    : batchSelectedCategoryNames.size * batchSelectedProductIds.size;
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -123,7 +161,25 @@ export default function PriceRules() {
     setCustomerSearchTerm("");
   };
 
+  const closeBatchForm = () => {
+    setShowBatchForm(false);
+    setBatchSelectedCustomerIds(new Set());
+    setBatchSelectedCategoryNames(new Set());
+    setBatchSelectedProductIds(new Set());
+    setBatchMarginPercent("");
+    setBatchIsActive(true);
+    setBatchMatchMode("customer");
+    setBatchCustomerSearch("");
+    setBatchProductSearch("");
+    setBatchProductCategoryFilter("");
+  };
+
   const openCreateForm = (type: string) => {
+    if (type === "customer_product") {
+      closeBatchForm();
+      setShowBatchForm(true);
+      return;
+    }
     setFormRuleType(type);
     setFormMarginPercent("");
     setFormCustomerId("");
@@ -194,8 +250,101 @@ export default function PriceRules() {
     }
   };
 
+  const handleBatchCreate = async () => {
+    if (!batchMarginPercent || isNaN(parseFloat(batchMarginPercent))) {
+      toast({ title: "Error", description: "Please enter a valid margin percentage", variant: "destructive" });
+      return;
+    }
+
+    if (batchSelectedProductIds.size === 0) {
+      toast({ title: "Error", description: "Please select at least one product", variant: "destructive" });
+      return;
+    }
+
+    if (batchMatchMode === "customer" && batchSelectedCustomerIds.size === 0) {
+      toast({ title: "Error", description: "Please select at least one customer", variant: "destructive" });
+      return;
+    }
+
+    if (batchMatchMode === "category" && batchSelectedCategoryNames.size === 0) {
+      toast({ title: "Error", description: "Please select at least one customer category", variant: "destructive" });
+      return;
+    }
+
+    setBatchCreating(true);
+    try {
+      const productIds = Array.from(batchSelectedProductIds);
+      const margin = parseFloat(batchMarginPercent);
+      let created = 0;
+
+      if (batchMatchMode === "customer") {
+        const customerIds = Array.from(batchSelectedCustomerIds);
+        for (const custId of customerIds) {
+          for (const prodId of productIds) {
+            await apiRequest("POST", "/api/price-rules", {
+              ruleType: "customer_product",
+              customerId: custId,
+              customerCategory: null,
+              productId: prodId,
+              marginPercent: margin,
+              isActive: batchIsActive,
+            });
+            created++;
+          }
+        }
+      } else {
+        const catNames = Array.from(batchSelectedCategoryNames);
+        for (const catName of catNames) {
+          for (const prodId of productIds) {
+            await apiRequest("POST", "/api/price-rules", {
+              ruleType: "customer_product",
+              customerId: null,
+              customerCategory: catName,
+              productId: prodId,
+              marginPercent: margin,
+              isActive: batchIsActive,
+            });
+            created++;
+          }
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/price-rules"] });
+      toast({ title: "Success", description: `${created} price rule(s) created` });
+      closeBatchForm();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to create price rules", variant: "destructive" });
+    } finally {
+      setBatchCreating(false);
+    }
+  };
+
+  const toggleCustomerId = (id: string) => {
+    setBatchSelectedCustomerIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCategoryName = (name: string) => {
+    setBatchSelectedCategoryNames(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
+
+  const toggleProductId = (id: string) => {
+    setBatchSelectedProductIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const getFormTitle = () => {
-    const action = editingRule ? "Edit" : "Create";
+    const action = editingRule ? "Edit" : "Add";
     switch (formRuleType) {
       case "global": return `${action} Global Rule`;
       case "product": return `${action} Product Rule`;
@@ -246,7 +395,6 @@ export default function PriceRules() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Global Rules Tab */}
         <TabsContent value="global">
           <Card>
             <CardHeader>
@@ -307,7 +455,6 @@ export default function PriceRules() {
           </Card>
         </TabsContent>
 
-        {/* Product Rules Tab */}
         <TabsContent value="product">
           <Card>
             <CardHeader>
@@ -370,7 +517,6 @@ export default function PriceRules() {
           </Card>
         </TabsContent>
 
-        {/* Customer Rules Tab */}
         <TabsContent value="customer">
           <Card>
             <CardHeader>
@@ -431,7 +577,6 @@ export default function PriceRules() {
           </Card>
         </TabsContent>
 
-        {/* Customer + Product Rules Tab */}
         <TabsContent value="customer_product">
           <Card>
             <CardHeader>
@@ -497,7 +642,7 @@ export default function PriceRules() {
         </TabsContent>
       </Tabs>
 
-      {/* Create/Edit Dialog */}
+      {/* Simple Create/Edit Dialog (Global, Product, Customer) */}
       <Dialog open={showForm} onOpenChange={(open) => !open && closeForm()}>
         <DialogContent className="max-w-lg" data-testid="price-rule-form-dialog">
           <DialogHeader>
@@ -505,7 +650,6 @@ export default function PriceRules() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Customer Selection (for customer and customer_product types) */}
             {(formRuleType === "customer" || formRuleType === "customer_product") && (
               <div className="space-y-4">
                 <div>
@@ -552,7 +696,6 @@ export default function PriceRules() {
                         </div>
                         {activeCustomers
                           .filter((c: any) => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()))
-                          .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
                           .map((c: any) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.name}
@@ -583,7 +726,6 @@ export default function PriceRules() {
               </div>
             )}
 
-            {/* Product Selection (for product and customer_product types) */}
             {(formRuleType === "product" || formRuleType === "customer_product") && (
               <div className="space-y-4">
                 <div>
@@ -623,9 +765,8 @@ export default function PriceRules() {
               </div>
             )}
 
-            {/* Margin Percent */}
             <div>
-              <label className="text-sm font-medium mb-2 block">Margin Percentage (%)</label>
+              <label className="text-sm font-medium mb-2 block">Margin Percent (%)</label>
               <Input
                 type="number"
                 step="0.01"
@@ -636,11 +777,10 @@ export default function PriceRules() {
               />
             </div>
 
-            {/* Active Status */}
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Active</label>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Status</label>
               <Select value={formIsActive ? "active" : "inactive"} onValueChange={(val) => setFormIsActive(val === "active")} data-testid="select-status">
-                <SelectTrigger className="w-32">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -661,6 +801,251 @@ export default function PriceRules() {
               data-testid="button-save-rule"
             >
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingRule ? "Update Rule" : "Create Rule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Create Dialog for Customer + Product Rules */}
+      <Dialog open={showBatchForm} onOpenChange={(open) => !open && closeBatchForm()}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="batch-rule-form-dialog">
+          <DialogHeader>
+            <DialogTitle data-testid="batch-form-title">Add Customer + Product Price Rule</DialogTitle>
+            <DialogDescription>
+              Select {batchMatchMode === "customer" ? "customers" : "customer categories"} and products to create combinations ({batchRuleCount} rule{batchRuleCount !== 1 ? "s" : ""} will be created)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Match By</label>
+              <Select
+                value={batchMatchMode}
+                onValueChange={(val: "customer" | "category") => {
+                  setBatchMatchMode(val);
+                  setBatchSelectedCustomerIds(new Set());
+                  setBatchSelectedCategoryNames(new Set());
+                  setBatchCustomerSearch("");
+                }}
+                data-testid="batch-select-match-mode"
+              >
+                <SelectTrigger className="w-60">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Individual Customer</SelectItem>
+                  <SelectItem value="category">Customer Category</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Left column: Customers or Categories */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold">
+                    {batchMatchMode === "customer"
+                      ? `Customers (${batchSelectedCustomerIds.size})`
+                      : `Categories (${batchSelectedCategoryNames.size})`}
+                  </span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        if (batchMatchMode === "customer") {
+                          setBatchSelectedCustomerIds(prev => {
+                            const next = new Set(prev);
+                            batchFilteredCustomers.forEach((c: any) => next.add(c.id));
+                            return next;
+                          });
+                        } else {
+                          setBatchSelectedCategoryNames(prev => {
+                            const next = new Set(prev);
+                            batchFilteredCategories.forEach((cat: any) => next.add(cat));
+                            return next;
+                          });
+                        }
+                      }}
+                      data-testid="batch-select-all-customers"
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        if (batchMatchMode === "customer") {
+                          setBatchSelectedCustomerIds(new Set());
+                        } else {
+                          setBatchSelectedCategoryNames(new Set());
+                        }
+                      }}
+                      data-testid="batch-clear-customers"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+                <Input
+                  placeholder={batchMatchMode === "customer" ? "Search customers..." : "Search categories..."}
+                  value={batchCustomerSearch}
+                  onChange={(e) => setBatchCustomerSearch(e.target.value)}
+                  className="mb-2 h-9"
+                  data-testid="batch-customer-search"
+                />
+                <div className="border rounded-md h-52 overflow-y-auto">
+                  {batchMatchMode === "customer" ? (
+                    batchFilteredCustomers.length === 0 ? (
+                      <div className="p-3 text-sm text-muted-foreground text-center">No customers found</div>
+                    ) : (
+                      batchFilteredCustomers.map((c: any) => (
+                        <label
+                          key={c.id}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                          data-testid={`batch-customer-${c.id}`}
+                        >
+                          <Checkbox
+                            checked={batchSelectedCustomerIds.has(c.id)}
+                            onCheckedChange={() => toggleCustomerId(c.id)}
+                          />
+                          <span className="text-sm truncate">{c.name}</span>
+                        </label>
+                      ))
+                    )
+                  ) : (
+                    batchFilteredCategories.length === 0 ? (
+                      <div className="p-3 text-sm text-muted-foreground text-center">No categories found</div>
+                    ) : (
+                      batchFilteredCategories.map((cat: any) => (
+                        <label
+                          key={cat}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                          data-testid={`batch-category-${cat}`}
+                        >
+                          <Checkbox
+                            checked={batchSelectedCategoryNames.has(cat)}
+                            onCheckedChange={() => toggleCategoryName(cat)}
+                          />
+                          <span className="text-sm truncate">{cat}</span>
+                        </label>
+                      ))
+                    )
+                  )}
+                </div>
+              </div>
+
+              {/* Right column: Products */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold">Products ({batchSelectedProductIds.size})</span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setBatchSelectedProductIds(prev => {
+                        const next = new Set(prev);
+                        batchFilteredProducts.forEach((p: any) => next.add(p.id));
+                        return next;
+                      })}
+                      data-testid="batch-select-all-products"
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setBatchSelectedProductIds(new Set())}
+                      data-testid="batch-clear-products"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    placeholder="Search products..."
+                    value={batchProductSearch}
+                    onChange={(e) => setBatchProductSearch(e.target.value)}
+                    className="h-9"
+                    data-testid="batch-product-search"
+                  />
+                  <Select value={batchProductCategoryFilter || "all_categories"} onValueChange={(v) => setBatchProductCategoryFilter(v === "all_categories" ? "" : v)}>
+                    <SelectTrigger className="w-44 h-9" data-testid="batch-product-category-filter">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all_categories">All Categories</SelectItem>
+                      {categories.map((cat: any) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="border rounded-md h-52 overflow-y-auto">
+                  {batchFilteredProducts.length === 0 ? (
+                    <div className="p-3 text-sm text-muted-foreground text-center">No products found</div>
+                  ) : (
+                    batchFilteredProducts.map((p: any) => (
+                      <label
+                        key={p.id}
+                        className="flex items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-testid={`batch-product-${p.id}`}
+                      >
+                        <Checkbox
+                          checked={batchSelectedProductIds.has(p.id)}
+                          onCheckedChange={() => toggleProductId(p.id)}
+                        />
+                        <span className="text-sm truncate">
+                          {p.name}{p.itemCode ? ` (${p.itemCode})` : ""}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold mb-2 block">Margin Percent (%)</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={batchMarginPercent}
+                onChange={(e) => setBatchMarginPercent(e.target.value)}
+                placeholder="Enter margin %"
+                data-testid="batch-input-margin"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold mb-2 block">Status</label>
+              <Select value={batchIsActive ? "active" : "inactive"} onValueChange={(val) => setBatchIsActive(val === "active")} data-testid="batch-select-status">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeBatchForm} data-testid="batch-button-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBatchCreate}
+              disabled={batchCreating || batchRuleCount === 0}
+              data-testid="batch-button-create"
+            >
+              {batchCreating ? "Creating..." : `Create ${batchRuleCount} Rule${batchRuleCount !== 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>
