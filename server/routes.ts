@@ -4868,13 +4868,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const userId = (req as any).user?.userId;
-        const { ruleType, customerId, customerCategory, productId, marginPercent, isActive } = req.body;
+        const { ruleType, customerId, customerCategory, productId, marginPercent, isActive, effectiveFromDate } = req.body;
 
         if (!ruleType || !["global", "product", "customer", "customer_product"].includes(ruleType)) {
           return res.status(400).json({ message: "Invalid rule type" });
         }
         if (marginPercent === undefined || marginPercent === null) {
           return res.status(400).json({ message: "Margin percent is required" });
+        }
+        if (effectiveFromDate && isNaN(new Date(effectiveFromDate).getTime())) {
+          return res.status(400).json({ message: "Invalid effective from date" });
         }
 
         const rule = await storage.createPriceRule({
@@ -4884,6 +4887,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           productId: productId || null,
           marginPercent: marginPercent.toString(),
           isActive: isActive !== undefined ? isActive : true,
+          effectiveFromDate: effectiveFromDate ? new Date(effectiveFromDate) : null,
           userId,
         });
         res.status(201).json(rule);
@@ -4909,7 +4913,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Price rule not found" });
         }
 
-        const { marginPercent, isActive, customerId, customerCategory, productId } = req.body;
+        const { marginPercent, isActive, customerId, customerCategory, productId, effectiveFromDate } = req.body;
+
+        if (effectiveFromDate && isNaN(new Date(effectiveFromDate).getTime())) {
+          return res.status(400).json({ message: "Invalid effective from date" });
+        }
 
         const updates: any = {};
         if (marginPercent !== undefined) updates.marginPercent = marginPercent.toString();
@@ -4917,6 +4925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (customerId !== undefined) updates.customerId = customerId || null;
         if (customerCategory !== undefined) updates.customerCategory = customerCategory || null;
         if (productId !== undefined) updates.productId = productId || null;
+        if (effectiveFromDate !== undefined) updates.effectiveFromDate = effectiveFromDate ? new Date(effectiveFromDate) : null;
 
         const rule = await storage.updatePriceRule(id, updates);
         if (!rule) {

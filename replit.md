@@ -35,6 +35,7 @@ Implements OAuth 2.0 integration with QuickBooks for accessing APIs, including s
     3. Product margin (productId)
     4. Global margin (ruleType='global')
     5. Fallback: inventory.sales_price (if no rule matches)
+  - **Effective From Date**: Each rule has an optional `effectiveFromDate` timestamp. Rules only apply to documents dated on or after that date. When multiple rules match, the most recent effective date (on or before the document date) wins. Rules with NULL effectiveFromDate match any document date (treated as "always applicable").
   - **Base Cost**: Latest purchase price from AP bills on or before document date; if none, inventory base_price
   - **Manual Override**: Users can always manually edit the auto-populated price
   - **User-Scoped**: All pricing queries are filtered by userId for multi-tenant isolation

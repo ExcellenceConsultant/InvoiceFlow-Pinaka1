@@ -167,6 +167,7 @@ export const priceRules = pgTable("price_rules", {
   productId: varchar("product_id").references(() => products.id),
   marginPercent: decimal("margin_percent", { precision: 7, scale: 2 }).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  effectiveFromDate: timestamp("effective_from_date"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

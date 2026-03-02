@@ -21,6 +21,7 @@ interface PriceRuleData {
   productId: string | null;
   marginPercent: string;
   isActive: boolean;
+  effectiveFromDate: string | null;
   customer?: { name: string; customerCategory?: string } | null;
   product?: { name: string; itemCode?: string; category?: string } | null;
   createdAt: string;
@@ -41,12 +42,14 @@ export default function PriceRules() {
   const [formProductId, setFormProductId] = useState("");
   const [formIsActive, setFormIsActive] = useState(true);
   const [formProductCategoryFilter, setFormProductCategoryFilter] = useState("");
+  const [formEffectiveDate, setFormEffectiveDate] = useState(new Date().toISOString().split("T")[0]);
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
 
   const [batchSelectedCustomerIds, setBatchSelectedCustomerIds] = useState<Set<string>>(new Set());
   const [batchSelectedCategoryNames, setBatchSelectedCategoryNames] = useState<Set<string>>(new Set());
   const [batchSelectedProductIds, setBatchSelectedProductIds] = useState<Set<string>>(new Set());
   const [batchMarginPercent, setBatchMarginPercent] = useState("");
+  const [batchEffectiveDate, setBatchEffectiveDate] = useState(new Date().toISOString().split("T")[0]);
   const [batchIsActive, setBatchIsActive] = useState(true);
   const [batchMatchMode, setBatchMatchMode] = useState<"customer" | "category">("customer");
   const [batchCustomerSearch, setBatchCustomerSearch] = useState("");
@@ -158,6 +161,7 @@ export default function PriceRules() {
     setFormProductId("");
     setFormIsActive(true);
     setFormProductCategoryFilter("");
+    setFormEffectiveDate(new Date().toISOString().split("T")[0]);
     setCustomerSearchTerm("");
   };
 
@@ -167,6 +171,7 @@ export default function PriceRules() {
     setBatchSelectedCategoryNames(new Set());
     setBatchSelectedProductIds(new Set());
     setBatchMarginPercent("");
+    setBatchEffectiveDate(new Date().toISOString().split("T")[0]);
     setBatchIsActive(true);
     setBatchMatchMode("customer");
     setBatchCustomerSearch("");
@@ -188,6 +193,7 @@ export default function PriceRules() {
     setFormProductId("");
     setFormIsActive(true);
     setFormProductCategoryFilter("");
+    setFormEffectiveDate(new Date().toISOString().split("T")[0]);
     setCustomerSearchTerm("");
     setEditingRule(null);
     setShowForm(true);
@@ -202,6 +208,7 @@ export default function PriceRules() {
     setFormProductId(rule.productId || "");
     setFormIsActive(rule.isActive);
     setFormProductCategoryFilter("");
+    setFormEffectiveDate(rule.effectiveFromDate ? new Date(rule.effectiveFromDate).toISOString().split("T")[0] : "");
     setCustomerSearchTerm("");
     setEditingRule(rule);
     setShowForm(true);
@@ -238,6 +245,7 @@ export default function PriceRules() {
       ruleType: formRuleType,
       marginPercent: parseFloat(formMarginPercent),
       isActive: formIsActive,
+      effectiveFromDate: formEffectiveDate || null,
       customerId: formCustomerId || null,
       customerCategory: formCustomerCategory || null,
       productId: formProductId || null,
@@ -288,6 +296,7 @@ export default function PriceRules() {
               productId: prodId,
               marginPercent: margin,
               isActive: batchIsActive,
+              effectiveFromDate: batchEffectiveDate || null,
             });
             created++;
           }
@@ -303,6 +312,7 @@ export default function PriceRules() {
               productId: prodId,
               marginPercent: margin,
               isActive: batchIsActive,
+              effectiveFromDate: batchEffectiveDate || null,
             });
             created++;
           }
@@ -352,6 +362,12 @@ export default function PriceRules() {
       case "customer_product": return `${action} Customer + Product Rule`;
       default: return `${action} Rule`;
     }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
   };
 
   const getCustomerOrCategoryLabel = (rule: PriceRuleData) => {
@@ -423,6 +439,7 @@ export default function PriceRules() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Margin %</TableHead>
+                      <TableHead>Effective From</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -431,6 +448,7 @@ export default function PriceRules() {
                     {globalRules.map((rule) => (
                       <TableRow key={rule.id} data-testid={`global-rule-${rule.id}`}>
                         <TableCell className="font-medium">{rule.marginPercent}%</TableCell>
+                        <TableCell>{formatDate(rule.effectiveFromDate)}</TableCell>
                         <TableCell>
                           <Badge variant={rule.isActive ? "default" : "secondary"}>
                             {rule.isActive ? "Active" : "Inactive"}
@@ -483,6 +501,7 @@ export default function PriceRules() {
                       <TableHead>Product</TableHead>
                       <TableHead>Item Code</TableHead>
                       <TableHead>Margin %</TableHead>
+                      <TableHead>Effective From</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -493,6 +512,7 @@ export default function PriceRules() {
                         <TableCell className="font-medium">{rule.product?.name || "Unknown"}</TableCell>
                         <TableCell>{rule.product?.itemCode || "-"}</TableCell>
                         <TableCell>{rule.marginPercent}%</TableCell>
+                        <TableCell>{formatDate(rule.effectiveFromDate)}</TableCell>
                         <TableCell>
                           <Badge variant={rule.isActive ? "default" : "secondary"}>
                             {rule.isActive ? "Active" : "Inactive"}
@@ -544,6 +564,7 @@ export default function PriceRules() {
                     <TableRow>
                       <TableHead>Customer / Category</TableHead>
                       <TableHead>Margin %</TableHead>
+                      <TableHead>Effective From</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -553,6 +574,7 @@ export default function PriceRules() {
                       <TableRow key={rule.id} data-testid={`customer-rule-${rule.id}`}>
                         <TableCell className="font-medium">{getCustomerOrCategoryLabel(rule)}</TableCell>
                         <TableCell>{rule.marginPercent}%</TableCell>
+                        <TableCell>{formatDate(rule.effectiveFromDate)}</TableCell>
                         <TableCell>
                           <Badge variant={rule.isActive ? "default" : "secondary"}>
                             {rule.isActive ? "Active" : "Inactive"}
@@ -606,6 +628,7 @@ export default function PriceRules() {
                       <TableHead>Product</TableHead>
                       <TableHead>Item Code</TableHead>
                       <TableHead>Margin %</TableHead>
+                      <TableHead>Effective From</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -617,6 +640,7 @@ export default function PriceRules() {
                         <TableCell>{rule.product?.name || "Unknown"}</TableCell>
                         <TableCell>{rule.product?.itemCode || "-"}</TableCell>
                         <TableCell>{rule.marginPercent}%</TableCell>
+                        <TableCell>{formatDate(rule.effectiveFromDate)}</TableCell>
                         <TableCell>
                           <Badge variant={rule.isActive ? "default" : "secondary"}>
                             {rule.isActive ? "Active" : "Inactive"}
@@ -774,6 +798,16 @@ export default function PriceRules() {
                 onChange={(e) => setFormMarginPercent(e.target.value)}
                 placeholder="Enter margin %"
                 data-testid="input-margin-percent"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Effective From Date</label>
+              <Input
+                type="date"
+                value={formEffectiveDate}
+                onChange={(e) => setFormEffectiveDate(e.target.value)}
+                data-testid="input-effective-date"
               />
             </div>
 
@@ -1019,6 +1053,16 @@ export default function PriceRules() {
                 onChange={(e) => setBatchMarginPercent(e.target.value)}
                 placeholder="Enter margin %"
                 data-testid="batch-input-margin"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold mb-2 block">Effective From Date</label>
+              <Input
+                type="date"
+                value={batchEffectiveDate}
+                onChange={(e) => setBatchEffectiveDate(e.target.value)}
+                data-testid="batch-input-effective-date"
               />
             </div>
 

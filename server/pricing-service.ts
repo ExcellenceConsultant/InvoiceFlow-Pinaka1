@@ -88,9 +88,13 @@ async function findApplicableRule(
   customerId: string,
   productId: string,
   userId?: string,
+  documentDate?: Date,
 ): Promise<{ margin: number; source: PriceCalculationResult['marginSource']; ruleId: string } | null> {
   
   const userFilter = userId ? eq(priceRules.userId, userId) : sql`1=1`;
+  const dateFilter = documentDate
+    ? sql`(${priceRules.effectiveFromDate} IS NULL OR ${priceRules.effectiveFromDate} <= ${documentDate})`
+    : sql`1=1`;
 
   const customerData = await db
     .select({ customerCategory: customers.customerCategory })
@@ -111,6 +115,7 @@ async function findApplicableRule(
     .where(
       and(
         userFilter,
+        dateFilter,
         eq(priceRules.ruleType, "customer_product"),
         eq(priceRules.isActive, true),
         eq(priceRules.productId, productId),
@@ -119,6 +124,7 @@ async function findApplicableRule(
     )
     .orderBy(
       sql`CASE WHEN ${priceRules.customerId} = ${customerId} THEN 0 ELSE 1 END`,
+      sql`${priceRules.effectiveFromDate} DESC NULLS LAST`,
       desc(priceRules.createdAt)
     )
     .limit(1);
@@ -142,6 +148,7 @@ async function findApplicableRule(
     .where(
       and(
         userFilter,
+        dateFilter,
         eq(priceRules.ruleType, "customer"),
         eq(priceRules.isActive, true),
         sql`(${priceRules.customerId} = ${customerId} OR ${priceRules.customerCategory} = ${customerCategory || ''})`
@@ -149,6 +156,7 @@ async function findApplicableRule(
     )
     .orderBy(
       sql`CASE WHEN ${priceRules.customerId} = ${customerId} THEN 0 ELSE 1 END`,
+      sql`${priceRules.effectiveFromDate} DESC NULLS LAST`,
       desc(priceRules.createdAt)
     )
     .limit(1);
@@ -170,12 +178,16 @@ async function findApplicableRule(
     .where(
       and(
         userFilter,
+        dateFilter,
         eq(priceRules.ruleType, "product"),
         eq(priceRules.isActive, true),
         eq(priceRules.productId, productId)
       )
     )
-    .orderBy(desc(priceRules.createdAt))
+    .orderBy(
+      sql`${priceRules.effectiveFromDate} DESC NULLS LAST`,
+      desc(priceRules.createdAt)
+    )
     .limit(1);
 
   if (productRules.length > 0) {
@@ -195,11 +207,15 @@ async function findApplicableRule(
     .where(
       and(
         userFilter,
+        dateFilter,
         eq(priceRules.ruleType, "global"),
         eq(priceRules.isActive, true)
       )
     )
-    .orderBy(desc(priceRules.createdAt))
+    .orderBy(
+      sql`${priceRules.effectiveFromDate} DESC NULLS LAST`,
+      desc(priceRules.createdAt)
+    )
     .limit(1);
 
   if (globalRules.length > 0) {
@@ -210,7 +226,6 @@ async function findApplicableRule(
     };
   }
 
-  // No rule found
   return null;
 }
 
@@ -251,7 +266,7 @@ export async function getSalesPrice(
     ? purchaseInfo.price 
     : parseFloat(product[0].basePrice || "0");
 
-  const rule = await findApplicableRule(customerId, productId, userId);
+  const rule = await findApplicableRule(customerId, productId, userId, documentDate);
 
   // Step 3: Calculate final price
   if (rule) {
