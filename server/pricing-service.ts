@@ -1,18 +1,20 @@
 /**
- * Advanced Price Rule Service
+ * Unified Price Rule Service
  * 
  * Calculates sales prices based on:
- * - Latest purchase price (determined by highest purchase_date before document_date)
- * - Margin percentage selected using priority rules
+ * - Latest purchase price from Bills (AP invoices)
+ * - Margin percentage from unified price_rules table
  * 
- * MARGIN PRIORITY (highest to lowest):
- * 1. Customer + Product specific margin (customer_product_margins table)
- * 2. Customer default margin (customers.default_margin_percent)
- * 3. Product default margin (products.margin_per_carton)
- * 4. Global default margin (system_settings with key 'global_default_margin')
- * 
- * PRICING FORMULA:
- * sales_price = latest_purchase_price × (1 + margin_percentage / 100)
+ * PRICING LOGIC:
+ * Step 1: Get latest purchase price from Bills. If none, use inventory base_price.
+ * Step 2: Find applicable rule by priority:
+ *   1. customer_product (customer_id+product_id OR customer_category+product_id)
+ *   2. customer (customer_id OR customer_category)
+ *   3. product (product_id)
+ *   4. global
+ * Step 3: If rule exists: finalPrice = baseCost × (1 + margin_percent/100)
+ *         If no rule: finalPrice = inventory.sales_price
+ * Round to 2 decimal places.
  */
 
 import { db } from "./db";
@@ -21,46 +23,27 @@ import {
   invoiceLineItems, 
   customers, 
   products, 
-  customerProductMargins,
-  systemSettings,
-  globalPriceRule,
-  productPriceRule,
-  customerPriceRule,
-  customerProductPriceRule
+  priceRules,
 } from "@shared/schema";
 import { eq, and, lte, desc, sql } from "drizzle-orm";
-
-// Default global margin if nothing is configured
-const FALLBACK_GLOBAL_MARGIN = 25;
 
 export interface PriceCalculationResult {
   salesPrice: number;
   latestPurchasePrice: number | null;
   latestPurchaseDate: Date | null;
   marginPercent: number;
-  marginSource: 'customer_product' | 'customer_default' | 'product_default' | 'global_default' | 'fallback';
+  marginSource: 'customer_product' | 'customer' | 'product' | 'global' | 'inventory_fallback';
+  ruleId?: string;
   message?: string;
 }
 
 /**
  * Get the latest purchase price for a product on or before a given date
- * 
- * Latest purchase price is determined by:
- * - Highest purchase_date (and timestamp if same date)
- * - From AP invoices (payable type) that are NOT draft, void, or cancelled
- * - Effective from purchase date onward (older documents not recalculated)
- * 
- * @param productId - The product to find purchase price for
- * @param documentDate - The reference date (order/invoice date)
- * @returns Latest purchase price info or null if no purchases found
  */
 async function getLatestPurchasePrice(
   productId: string,
   documentDate: Date
 ): Promise<{ price: number; purchaseDate: Date } | null> {
-  // Find the most recent AP invoice (bill) line item for this product
-  // that was created on or before the document date
-  // Exclude draft, void, and cancelled invoices to ensure only finalized purchases are used
   const result = await db
     .select({
       unitPrice: invoiceLineItems.unitPrice,
@@ -72,9 +55,8 @@ async function getLatestPurchasePrice(
     .where(
       and(
         eq(invoiceLineItems.productId, productId),
-        eq(invoices.invoiceType, "payable"), // AP invoices (bills) = purchases
+        eq(invoices.invoiceType, "payable"),
         lte(invoices.invoiceDate, documentDate),
-        // Exclude draft, void, and cancelled invoices - only use finalized/sent/paid invoices
         sql`${invoices.status} NOT IN ('draft', 'void', 'cancelled')`
       )
     )
@@ -92,353 +74,274 @@ async function getLatestPurchasePrice(
 }
 
 /**
- * Get the margin percentage using priority rules from Price Rule tables
+ * Find the applicable price rule using priority matching
  * 
- * Priority order (first match wins, margins not combined):
- * 1. Customer + Product Price Rule (active, effective_from_date <= documentDate)
- * 2. Customer Price Rule (active, effective_from_date <= documentDate)
- * 3. Product Price Rule (active)
- * 4. Global Price Rule (enabled)
+ * Priority order:
+ * 1. customer_product: (customer_id + product_id) OR (customer_category + product_id)
+ * 2. customer: customer_id OR customer_category
+ * 3. product: product_id
+ * 4. global: rule_type = 'global'
  * 
- * @param customerId - The customer ID
- * @param productId - The product ID
- * @param documentDate - The document date for effective date filtering
- * @returns Margin info with percentage and source
+ * Returns null if no rule found (will use inventory.sales_price as fallback)
  */
-async function getMarginPercent(
+async function findApplicableRule(
   customerId: string,
   productId: string,
-  documentDate: Date = new Date()
-): Promise<{ margin: number; source: PriceCalculationResult['marginSource'] }> {
+  userId?: string,
+): Promise<{ margin: number; source: PriceCalculationResult['marginSource']; ruleId: string } | null> {
   
-  // Priority 1: Customer + Product Price Rule (active, effective date check)
-  const customerProductRule = await db
-    .select({ marginPercent: customerProductPriceRule.marginPercent })
-    .from(customerProductPriceRule)
-    .where(
-      and(
-        eq(customerProductPriceRule.customerId, customerId),
-        eq(customerProductPriceRule.productId, productId),
-        eq(customerProductPriceRule.status, "active"),
-        lte(customerProductPriceRule.effectiveFromDate, documentDate)
-      )
-    )
-    .orderBy(desc(customerProductPriceRule.effectiveFromDate))
-    .limit(1);
+  const userFilter = userId ? eq(priceRules.userId, userId) : sql`1=1`;
 
-  if (customerProductRule.length > 0 && customerProductRule[0].marginPercent !== null) {
-    return {
-      margin: parseFloat(customerProductRule[0].marginPercent),
-      source: 'customer_product',
-    };
-  }
-
-  // Fallback: Check legacy customerProductMargins table for backwards compatibility
-  const legacyMargin = await db
-    .select({ marginPercent: customerProductMargins.marginPercent })
-    .from(customerProductMargins)
-    .where(
-      and(
-        eq(customerProductMargins.customerId, customerId),
-        eq(customerProductMargins.productId, productId)
-      )
-    )
-    .limit(1);
-
-  if (legacyMargin.length > 0 && legacyMargin[0].marginPercent !== null) {
-    return {
-      margin: parseFloat(legacyMargin[0].marginPercent),
-      source: 'customer_product',
-    };
-  }
-
-  // Priority 2: Individual Customer Price Rule (active, effective date check)
-  const customerRule = await db
-    .select({ marginPercent: customerPriceRule.marginPercent })
-    .from(customerPriceRule)
-    .where(
-      and(
-        eq(customerPriceRule.customerId, customerId),
-        eq(customerPriceRule.status, "active"),
-        lte(customerPriceRule.effectiveFromDate, documentDate)
-      )
-    )
-    .orderBy(desc(customerPriceRule.effectiveFromDate))
-    .limit(1);
-
-  if (customerRule.length > 0 && customerRule[0].marginPercent !== null) {
-    return {
-      margin: parseFloat(customerRule[0].marginPercent),
-      source: 'customer_default',
-    };
-  }
-
-  // Priority 2b: Customer Category Price Rule
-  // Look up the customer's category, then find matching category-based rules
   const customerData = await db
-    .select({ 
-      customerCategory: customers.customerCategory,
-      defaultMarginPercent: customers.defaultMarginPercent 
-    })
+    .select({ customerCategory: customers.customerCategory })
     .from(customers)
     .where(eq(customers.id, customerId))
     .limit(1);
 
-  if (customerData.length > 0 && customerData[0].customerCategory) {
-    const categoryRule = await db
-      .select({ marginPercent: customerPriceRule.marginPercent })
-      .from(customerPriceRule)
-      .where(
-        and(
-          eq(customerPriceRule.customerCategory, customerData[0].customerCategory),
-          sql`${customerPriceRule.customerId} IS NULL`,
-          eq(customerPriceRule.status, "active"),
-          lte(customerPriceRule.effectiveFromDate, documentDate)
-        )
-      )
-      .orderBy(desc(customerPriceRule.effectiveFromDate))
-      .limit(1);
+  const customerCategory = customerData.length > 0 ? customerData[0].customerCategory : null;
 
-    if (categoryRule.length > 0 && categoryRule[0].marginPercent !== null) {
-      return {
-        margin: parseFloat(categoryRule[0].marginPercent),
-        source: 'customer_default',
-      };
-    }
-  }
-
-  // Fallback: Check legacy customer default margin
-  if (customerData.length > 0 && customerData[0].defaultMarginPercent !== null) {
-    return {
-      margin: parseFloat(customerData[0].defaultMarginPercent),
-      source: 'customer_default',
-    };
-  }
-
-  // Priority 3: Product Price Rule (active)
-  const productRule = await db
-    .select({ marginPercent: productPriceRule.marginPercent })
-    .from(productPriceRule)
+  const customerProductRules = await db
+    .select({
+      id: priceRules.id,
+      marginPercent: priceRules.marginPercent,
+      customerId: priceRules.customerId,
+      customerCategory: priceRules.customerCategory,
+    })
+    .from(priceRules)
     .where(
       and(
-        eq(productPriceRule.productId, productId),
-        eq(productPriceRule.status, "active")
+        userFilter,
+        eq(priceRules.ruleType, "customer_product"),
+        eq(priceRules.isActive, true),
+        eq(priceRules.productId, productId),
+        sql`(${priceRules.customerId} = ${customerId} OR ${priceRules.customerCategory} = ${customerCategory || ''})`
       )
+    )
+    .orderBy(
+      sql`CASE WHEN ${priceRules.customerId} = ${customerId} THEN 0 ELSE 1 END`,
+      desc(priceRules.createdAt)
     )
     .limit(1);
 
-  if (productRule.length > 0 && productRule[0].marginPercent !== null) {
+  if (customerProductRules.length > 0) {
     return {
-      margin: parseFloat(productRule[0].marginPercent),
-      source: 'product_default',
+      margin: parseFloat(customerProductRules[0].marginPercent),
+      source: 'customer_product',
+      ruleId: customerProductRules[0].id,
     };
   }
 
-  // Fallback: Check legacy product margin
-  const product = await db
-    .select({ marginPerCarton: products.marginPerCarton })
-    .from(products)
-    .where(eq(products.id, productId))
-    .limit(1);
-
-  if (product.length > 0 && product[0].marginPerCarton !== null) {
-    return {
-      margin: parseFloat(product[0].marginPerCarton),
-      source: 'product_default',
-    };
-  }
-
-  // Priority 4: Global Price Rule (enabled)
-  const globalRule = await db
-    .select({ 
-      enableAutoPriceRule: globalPriceRule.enableAutoPriceRule,
-      defaultMarginPercent: globalPriceRule.defaultMarginPercent 
+  const customerRules = await db
+    .select({
+      id: priceRules.id,
+      marginPercent: priceRules.marginPercent,
+      customerId: priceRules.customerId,
+      customerCategory: priceRules.customerCategory,
     })
-    .from(globalPriceRule)
+    .from(priceRules)
+    .where(
+      and(
+        userFilter,
+        eq(priceRules.ruleType, "customer"),
+        eq(priceRules.isActive, true),
+        sql`(${priceRules.customerId} = ${customerId} OR ${priceRules.customerCategory} = ${customerCategory || ''})`
+      )
+    )
+    .orderBy(
+      sql`CASE WHEN ${priceRules.customerId} = ${customerId} THEN 0 ELSE 1 END`,
+      desc(priceRules.createdAt)
+    )
     .limit(1);
 
-  if (globalRule.length > 0 && 
-      globalRule[0].enableAutoPriceRule && 
-      globalRule[0].defaultMarginPercent !== null) {
+  if (customerRules.length > 0) {
     return {
-      margin: parseFloat(globalRule[0].defaultMarginPercent),
-      source: 'global_default',
+      margin: parseFloat(customerRules[0].marginPercent),
+      source: 'customer',
+      ruleId: customerRules[0].id,
     };
   }
 
-  // Legacy fallback: Check system settings
-  const globalSetting = await db
-    .select({ value: systemSettings.value })
-    .from(systemSettings)
-    .where(eq(systemSettings.key, 'global_default_margin'))
+  const productRules = await db
+    .select({
+      id: priceRules.id,
+      marginPercent: priceRules.marginPercent,
+    })
+    .from(priceRules)
+    .where(
+      and(
+        userFilter,
+        eq(priceRules.ruleType, "product"),
+        eq(priceRules.isActive, true),
+        eq(priceRules.productId, productId)
+      )
+    )
+    .orderBy(desc(priceRules.createdAt))
     .limit(1);
 
-  if (globalSetting.length > 0 && globalSetting[0].value !== null) {
-    const globalMargin = globalSetting[0].value as { percent: number };
-    if (typeof globalMargin.percent === 'number') {
-      return {
-        margin: globalMargin.percent,
-        source: 'global_default',
-      };
-    }
+  if (productRules.length > 0) {
+    return {
+      margin: parseFloat(productRules[0].marginPercent),
+      source: 'product',
+      ruleId: productRules[0].id,
+    };
   }
 
-  // Fallback: Use hardcoded default
-  return {
-    margin: FALLBACK_GLOBAL_MARGIN,
-    source: 'fallback',
-  };
+  const globalRules = await db
+    .select({
+      id: priceRules.id,
+      marginPercent: priceRules.marginPercent,
+    })
+    .from(priceRules)
+    .where(
+      and(
+        userFilter,
+        eq(priceRules.ruleType, "global"),
+        eq(priceRules.isActive, true)
+      )
+    )
+    .orderBy(desc(priceRules.createdAt))
+    .limit(1);
+
+  if (globalRules.length > 0) {
+    return {
+      margin: parseFloat(globalRules[0].marginPercent),
+      source: 'global',
+      ruleId: globalRules[0].id,
+    };
+  }
+
+  // No rule found
+  return null;
 }
 
 /**
- * Main pricing function - calculates sales price for a product based on customer and date
+ * Main pricing function - calculates sales price for a product
  * 
- * USAGE:
- * - Call when adding a product to a Sales Order or Sales Invoice
- * - Pass the document date to ensure proper price lookup
- * - Returns calculated price that can be manually overridden if needed
- * 
- * FORMULA:
- * sales_price = latest_purchase_price × (1 + margin_percentage / 100)
- * 
- * @param productId - The product ID
- * @param customerId - The customer ID
- * @param documentDate - The order/invoice date for price lookup
- * @returns PriceCalculationResult with calculated price and margin details
+ * Step 1: baseCost = latest purchase price from Bills, or inventory.base_price
+ * Step 2: Find applicable rule by priority
+ * Step 3: If rule exists: finalPrice = baseCost × (1 + margin/100)
+ *         If no rule: finalPrice = inventory.sales_price
  */
 export async function getSalesPrice(
   productId: string,
   customerId: string,
-  documentDate: Date
+  documentDate: Date,
+  userId?: string
 ): Promise<PriceCalculationResult> {
-  // Get latest purchase price on or before the document date
   const purchaseInfo = await getLatestPurchasePrice(productId, documentDate);
+  
+  const product = await db
+    .select({ basePrice: products.basePrice, salesPrice: products.salesPrice })
+    .from(products)
+    .where(eq(products.id, productId))
+    .limit(1);
 
-  // Get the margin percentage using priority rules (with effective date filtering)
-  const marginInfo = await getMarginPercent(customerId, productId, documentDate);
-
-  // If no purchase price found, try to use product's base price as fallback
-  if (!purchaseInfo) {
-    const product = await db
-      .select({ basePrice: products.basePrice, salesPrice: products.salesPrice })
-      .from(products)
-      .where(eq(products.id, productId))
-      .limit(1);
-
-    if (product.length > 0) {
-      // Use existing sales price if available, otherwise calculate from base price
-      const basePrice = parseFloat(product[0].basePrice);
-      const existingSalesPrice = product[0].salesPrice ? parseFloat(product[0].salesPrice) : null;
-      
-      // Calculate price using margin on base price if no sales price exists
-      const calculatedPrice = existingSalesPrice || basePrice * (1 + marginInfo.margin / 100);
-      
-      return {
-        salesPrice: Math.round(calculatedPrice * 100) / 100,
-        latestPurchasePrice: null,
-        latestPurchaseDate: null,
-        marginPercent: marginInfo.margin,
-        marginSource: marginInfo.source,
-        message: 'No purchase history found. Using product base/sales price.',
-      };
-    }
-
-    // No product found - return zero
+  if (product.length === 0) {
     return {
       salesPrice: 0,
       latestPurchasePrice: null,
       latestPurchaseDate: null,
-      marginPercent: marginInfo.margin,
-      marginSource: marginInfo.source,
+      marginPercent: 0,
+      marginSource: 'inventory_fallback',
       message: 'Product not found.',
     };
   }
 
-  // Calculate sales price: purchase_price × (1 + margin / 100)
-  const salesPrice = purchaseInfo.price * (1 + marginInfo.margin / 100);
+  const baseCost = purchaseInfo 
+    ? purchaseInfo.price 
+    : parseFloat(product[0].basePrice || "0");
 
+  const rule = await findApplicableRule(customerId, productId, userId);
+
+  // Step 3: Calculate final price
+  if (rule) {
+    const finalPrice = baseCost * (1 + rule.margin / 100);
+    return {
+      salesPrice: Math.round(finalPrice * 100) / 100,
+      latestPurchasePrice: purchaseInfo?.price || null,
+      latestPurchaseDate: purchaseInfo?.purchaseDate || null,
+      marginPercent: rule.margin,
+      marginSource: rule.source,
+      ruleId: rule.ruleId,
+      message: purchaseInfo 
+        ? undefined 
+        : 'No purchase history. Using inventory base price as base cost.',
+    };
+  }
+
+  // No rule found - use inventory.sales_price
+  const inventorySalesPrice = parseFloat(product[0].salesPrice || "0");
   return {
-    salesPrice: Math.round(salesPrice * 100) / 100,
-    latestPurchasePrice: purchaseInfo.price,
-    latestPurchaseDate: purchaseInfo.purchaseDate,
-    marginPercent: marginInfo.margin,
-    marginSource: marginInfo.source,
+    salesPrice: Math.round(inventorySalesPrice * 100) / 100,
+    latestPurchasePrice: purchaseInfo?.price || null,
+    latestPurchaseDate: purchaseInfo?.purchaseDate || null,
+    marginPercent: 0,
+    marginSource: 'inventory_fallback',
+    message: 'No price rule found. Using inventory sales price.',
   };
 }
 
 /**
- * Batch get sales prices for multiple products
- * Useful when loading all products for a specific customer
- * 
- * @param productIds - Array of product IDs
- * @param customerId - The customer ID
- * @param documentDate - The document date
- * @returns Map of productId to PriceCalculationResult
+ * Get global default margin from the price_rules table
  */
-export async function getBatchSalesPrices(
-  productIds: string[],
-  customerId: string,
-  documentDate: Date
-): Promise<Map<string, PriceCalculationResult>> {
-  const results = new Map<string, PriceCalculationResult>();
+export async function getGlobalDefaultMargin(userId?: string): Promise<number | null> {
+  const conditions = [eq(priceRules.ruleType, "global"), eq(priceRules.isActive, true)];
+  if (userId) conditions.push(eq(priceRules.userId, userId));
   
-  // Process in parallel for efficiency
-  await Promise.all(
-    productIds.map(async (productId) => {
-      const result = await getSalesPrice(productId, customerId, documentDate);
-      results.set(productId, result);
-    })
-  );
-
-  return results;
+  const [rule] = await db
+    .select()
+    .from(priceRules)
+    .where(and(...conditions))
+    .limit(1);
+  
+  return rule ? parseFloat(rule.marginPercent) : null;
 }
 
 /**
- * Set or update global default margin
- * 
- * @param marginPercent - The global margin percentage
+ * Set global default margin in the price_rules table
  */
-export async function setGlobalDefaultMargin(marginPercent: number): Promise<void> {
-  const existing = await db
+export async function setGlobalDefaultMargin(marginPercent: number, userId?: string): Promise<void> {
+  const conditions = [eq(priceRules.ruleType, "global"), eq(priceRules.isActive, true)];
+  if (userId) conditions.push(eq(priceRules.userId, userId));
+
+  const [existing] = await db
     .select()
-    .from(systemSettings)
-    .where(eq(systemSettings.key, 'global_default_margin'))
+    .from(priceRules)
+    .where(and(...conditions))
     .limit(1);
 
-  if (existing.length > 0) {
+  if (existing) {
     await db
-      .update(systemSettings)
-      .set({ 
-        value: { percent: marginPercent },
-        updatedAt: new Date(),
-      })
-      .where(eq(systemSettings.key, 'global_default_margin'));
+      .update(priceRules)
+      .set({ marginPercent: marginPercent.toString(), updatedAt: new Date() })
+      .where(eq(priceRules.id, existing.id));
   } else {
-    await db.insert(systemSettings).values({
-      key: 'global_default_margin',
-      value: { percent: marginPercent },
+    await db.insert(priceRules).values({
+      ruleType: "global",
+      marginPercent: marginPercent.toString(),
+      isActive: true,
+      userId: userId || null,
     });
   }
 }
 
 /**
- * Get global default margin
- * 
- * @returns The global margin percentage or fallback default
+ * Batch get sales prices for multiple products
  */
-export async function getGlobalDefaultMargin(): Promise<number> {
-  const setting = await db
-    .select({ value: systemSettings.value })
-    .from(systemSettings)
-    .where(eq(systemSettings.key, 'global_default_margin'))
-    .limit(1);
+export async function getBatchSalesPrices(
+  productIds: string[],
+  customerId: string,
+  documentDate: Date,
+  userId?: string
+): Promise<Map<string, PriceCalculationResult>> {
+  const results = new Map<string, PriceCalculationResult>();
+  
+  await Promise.all(
+    productIds.map(async (productId) => {
+      const result = await getSalesPrice(productId, customerId, documentDate, userId);
+      results.set(productId, result);
+    })
+  );
 
-  if (setting.length > 0 && setting[0].value !== null) {
-    const value = setting[0].value as { percent: number };
-    if (typeof value.percent === 'number') {
-      return value.percent;
-    }
-  }
-
-  return FALLBACK_GLOBAL_MARGIN;
+  return results;
 }

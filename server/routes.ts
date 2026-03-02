@@ -4821,6 +4821,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // ============================================
+  // UNIFIED PRICE RULES API
+  // ============================================
+
+  // Get all price rules (optionally filtered by type)
+  app.get(
+    "/api/price-rules",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const { type } = req.query;
+
+        let rules;
+        if (type && typeof type === "string") {
+          rules = await storage.getPriceRulesByType(userId, type);
+        } else {
+          rules = await storage.getPriceRules(userId);
+        }
+
+        const allCustomers = await storage.getCustomers(userId);
+        const allProducts = await storage.getProducts(userId);
+        const customerMap = new Map(allCustomers.map((c: any) => [c.id, c]));
+        const productMap = new Map(allProducts.map((p: any) => [p.id, p]));
+
+        const enrichedRules = rules.map((rule: any) => ({
+          ...rule,
+          customer: rule.customerId ? customerMap.get(rule.customerId) : null,
+          product: rule.productId ? productMap.get(rule.productId) : null,
+        }));
+
+        res.json(enrichedRules);
+      } catch (error) {
+        console.error("Error fetching price rules:", error);
+        res.status(500).json({ message: "Failed to fetch price rules" });
+      }
+    }
+  );
+
+  // Create price rule
+  app.post(
+    "/api/price-rules",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const { ruleType, customerId, customerCategory, productId, marginPercent, isActive } = req.body;
+
+        if (!ruleType || !["global", "product", "customer", "customer_product"].includes(ruleType)) {
+          return res.status(400).json({ message: "Invalid rule type" });
+        }
+        if (marginPercent === undefined || marginPercent === null) {
+          return res.status(400).json({ message: "Margin percent is required" });
+        }
+
+        const rule = await storage.createPriceRule({
+          ruleType,
+          customerId: customerId || null,
+          customerCategory: customerCategory || null,
+          productId: productId || null,
+          marginPercent: marginPercent.toString(),
+          isActive: isActive !== undefined ? isActive : true,
+          userId,
+        });
+        res.status(201).json(rule);
+      } catch (error) {
+        console.error("Error creating price rule:", error);
+        res.status(500).json({ message: "Failed to create price rule" });
+      }
+    }
+  );
+
+  // Update price rule
+  app.patch(
+    "/api/price-rules/:id",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const { id } = req.params;
+
+        const existing = await storage.getPriceRule(id);
+        if (!existing || existing.userId !== userId) {
+          return res.status(404).json({ message: "Price rule not found" });
+        }
+
+        const { marginPercent, isActive, customerId, customerCategory, productId } = req.body;
+
+        const updates: any = {};
+        if (marginPercent !== undefined) updates.marginPercent = marginPercent.toString();
+        if (isActive !== undefined) updates.isActive = isActive;
+        if (customerId !== undefined) updates.customerId = customerId || null;
+        if (customerCategory !== undefined) updates.customerCategory = customerCategory || null;
+        if (productId !== undefined) updates.productId = productId || null;
+
+        const rule = await storage.updatePriceRule(id, updates);
+        if (!rule) {
+          return res.status(404).json({ message: "Price rule not found" });
+        }
+        res.json(rule);
+      } catch (error) {
+        console.error("Error updating price rule:", error);
+        res.status(500).json({ message: "Failed to update price rule" });
+      }
+    }
+  );
+
+  // Delete price rule
+  app.delete(
+    "/api/price-rules/:id",
+    isAuthenticated,
+    requireRole(["super_admin", "admin"]),
+    async (req, res) => {
+      try {
+        const userId = (req as any).user?.userId;
+        const { id } = req.params;
+
+        const existing = await storage.getPriceRule(id);
+        if (!existing || existing.userId !== userId) {
+          return res.status(404).json({ message: "Price rule not found" });
+        }
+
+        const success = await storage.deletePriceRule(id);
+        if (!success) {
+          return res.status(404).json({ message: "Price rule not found" });
+        }
+        res.json({ message: "Price rule deleted" });
+      } catch (error) {
+        console.error("Error deleting price rule:", error);
+        res.status(500).json({ message: "Failed to delete price rule" });
+      }
+    }
+  );
+
+  // ============================================
   // INVENTORY MARGIN MANAGEMENT (Super Admin Only)
   // ============================================
 
@@ -5340,7 +5477,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid documentDate format" });
       }
 
-      const result = await getSalesPrice(productId, customerId, date);
+      const userId = (req as any).user?.userId;
+      const result = await getSalesPrice(productId, customerId, date, userId);
       res.json(result);
     } catch (error) {
       console.error("Error calculating price:", error);
@@ -5364,7 +5502,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid documentDate format" });
       }
 
-      const results = await getBatchSalesPrices(productIds, customerId, date);
+      const userId = (req as any).user?.userId;
+      const results = await getBatchSalesPrices(productIds, customerId, date, userId);
       
       // Convert Map to object for JSON serialization
       const response: Record<string, any> = {};
@@ -5382,7 +5521,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get global default margin
   app.get("/api/pricing/global-margin", isAuthenticated, async (req, res) => {
     try {
-      const margin = await getGlobalDefaultMargin();
+      const userId = (req as any).user?.userId;
+      const margin = await getGlobalDefaultMargin(userId);
       res.json({ marginPercent: margin });
     } catch (error) {
       console.error("Error getting global margin:", error);
@@ -5401,7 +5541,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      await setGlobalDefaultMargin(marginPercent);
+      const userId = (req as any).user?.userId;
+      await setGlobalDefaultMargin(marginPercent, userId);
       res.json({ message: "Global margin updated successfully", marginPercent });
     } catch (error) {
       console.error("Error setting global margin:", error);

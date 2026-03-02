@@ -16,6 +16,7 @@ import {
   productPriceRule,
   customerPriceRule,
   customerProductPriceRule,
+  priceRules,
   taxAgencies,
   taxRates,
   taxCodes,
@@ -55,6 +56,8 @@ import {
   type InsertCustomerPriceRule,
   type CustomerProductPriceRule,
   type InsertCustomerProductPriceRule,
+  type PriceRule,
+  type InsertPriceRule,
   type TaxAgency,
   type InsertTaxAgency,
   type TaxRate,
@@ -1078,6 +1081,50 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(customerProductPriceRule)
       .where(eq(customerProductPriceRule.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ============================================
+  // UNIFIED PRICE RULES
+  // ============================================
+
+  async getPriceRules(userId: string): Promise<PriceRule[]> {
+    await this.ensureInitialized();
+    return await db.select().from(priceRules).where(eq(priceRules.userId, userId)).orderBy(priceRules.createdAt);
+  }
+
+  async getPriceRulesByType(userId: string, ruleType: string): Promise<PriceRule[]> {
+    await this.ensureInitialized();
+    return await db.select().from(priceRules).where(
+      and(eq(priceRules.userId, userId), eq(priceRules.ruleType, ruleType))
+    ).orderBy(priceRules.createdAt);
+  }
+
+  async getPriceRule(id: string): Promise<PriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db.select().from(priceRules).where(eq(priceRules.id, id)).limit(1);
+    return rule;
+  }
+
+  async createPriceRule(ruleData: InsertPriceRule): Promise<PriceRule> {
+    await this.ensureInitialized();
+    const [rule] = await db.insert(priceRules).values(ruleData).returning();
+    return rule;
+  }
+
+  async updatePriceRule(id: string, updates: Partial<PriceRule>): Promise<PriceRule | undefined> {
+    await this.ensureInitialized();
+    const [rule] = await db
+      .update(priceRules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(priceRules.id, id))
+      .returning();
+    return rule;
+  }
+
+  async deletePriceRule(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const result = await db.delete(priceRules).where(eq(priceRules.id, id));
     return (result.rowCount || 0) > 0;
   }
 

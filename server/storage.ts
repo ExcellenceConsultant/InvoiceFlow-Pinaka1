@@ -31,6 +31,8 @@ import {
   type InsertCustomerPriceRule,
   type CustomerProductPriceRule,
   type InsertCustomerProductPriceRule,
+  type PriceRule,
+  type InsertPriceRule,
   type TaxAgency,
   type InsertTaxAgency,
   type TaxRate,
@@ -202,6 +204,14 @@ export interface IStorage {
   createCustomerProductPriceRule(rule: InsertCustomerProductPriceRule & { userId: string }): Promise<CustomerProductPriceRule>;
   updateCustomerProductPriceRule(id: string, updates: Partial<CustomerProductPriceRule>): Promise<CustomerProductPriceRule | undefined>;
   deleteCustomerProductPriceRule(id: string): Promise<boolean>;
+
+  // Unified Price Rules
+  getPriceRules(userId: string): Promise<PriceRule[]>;
+  getPriceRulesByType(userId: string, ruleType: string): Promise<PriceRule[]>;
+  getPriceRule(id: string): Promise<PriceRule | undefined>;
+  createPriceRule(rule: InsertPriceRule): Promise<PriceRule>;
+  updatePriceRule(id: string, updates: Partial<PriceRule>): Promise<PriceRule | undefined>;
+  deletePriceRule(id: string): Promise<boolean>;
 
   // ============================================
   // SALES TAX CENTER (QuickBooks Aligned)
@@ -1016,6 +1026,24 @@ export class MemStorage implements IStorage {
     return undefined;
   }
   async deleteCustomerProductPriceRule(_id: string): Promise<boolean> {
+    return false;
+  }
+  async getPriceRules(_userId: string): Promise<PriceRule[]> {
+    return [];
+  }
+  async getPriceRulesByType(_userId: string, _ruleType: string): Promise<PriceRule[]> {
+    return [];
+  }
+  async getPriceRule(_id: string): Promise<PriceRule | undefined> {
+    return undefined;
+  }
+  async createPriceRule(_rule: InsertPriceRule): Promise<PriceRule> {
+    throw new Error("Not implemented");
+  }
+  async updatePriceRule(_id: string, _updates: Partial<PriceRule>): Promise<PriceRule | undefined> {
+    return undefined;
+  }
+  async deletePriceRule(_id: string): Promise<boolean> {
     return false;
   }
 }

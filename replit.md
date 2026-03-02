@@ -28,14 +28,17 @@ Implements OAuth 2.0 integration with QuickBooks for accessing APIs, including s
 - **Manual Price Control**: Product prices (Base Price and Sales Price) are manually set in the inventory and are NOT automatically updated by invoices. This ensures price stability and allows complete control over pricing in the inventory management system.
 - **Advanced Price Rule System**: Automatic sales price calculation based on latest purchase price + margin percentage. When adding products to Sales Orders or Sales Invoices (AR), prices are auto-calculated using:
   - **Formula**: `sales_price = latest_purchase_price × (1 + margin_percentage / 100)`
+  - **Unified Price Rules Table** (`price_rules`): Single table with `ruleType` column supporting 4 types: global, product, customer, customer_product. Columns: id, ruleType, customerId, customerCategory, productId, marginPercent, isActive, userId, createdAt, updatedAt.
   - **Margin Priority** (first match wins, not combined):
-    1. Customer + Product specific margin (`customer_product_margins` table)
-    2. Customer default margin (`customers.default_margin_percent`)
-    3. Product default margin (`products.margin_per_carton`)
-    4. Global default margin (system settings)
-  - **Latest Purchase Price**: Determined by highest purchase_date from AP invoices (bills) on or before the document date
+    1. Customer + Product specific margin (customerId+productId OR customerCategory+productId)
+    2. Customer margin (customerId OR customerCategory)
+    3. Product margin (productId)
+    4. Global margin (ruleType='global')
+    5. Fallback: inventory.sales_price (if no rule matches)
+  - **Base Cost**: Latest purchase price from AP bills on or before document date; if none, inventory base_price
   - **Manual Override**: Users can always manually edit the auto-populated price
-  - **API Endpoints**: `/api/pricing/calculate`, `/api/pricing/calculate-batch`, `/api/pricing/global-margin`, `/api/pricing/customer-product-margins`
+  - **User-Scoped**: All pricing queries are filtered by userId for multi-tenant isolation
+  - **API Endpoints**: `/api/price-rules` (unified CRUD), `/api/pricing/calculate`, `/api/pricing/calculate-batch`, `/api/pricing/global-margin`
 - **QuickBooks Integration**: 
   - **Inventory Sync**: Products sync by SKU (item code) first for accurate matching, then by name as fallback. When item code exists, products are created as Inventory items with SKU tracking in QuickBooks. Products without item codes are created as Service items. This prevents duplicates and ensures proper inventory tracking.
   - **Direct Invoice/Bill Posting**: Endpoint `/api/invoices/:id/post-to-quickbooks` posts actual QB invoices (AR) or bills (AP) with all line items, automatically syncing products by item code first. AR invoices use `SalesItemLineDetail` and AP bills use `ItemBasedExpenseLineDetail` to properly reference inventory items.

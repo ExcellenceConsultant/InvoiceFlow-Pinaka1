@@ -156,6 +156,22 @@ export const customerProductPriceRule = pgTable("customer_product_price_rule", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Unified Price Rules table - single table for all price rule types
+export const priceRules = pgTable("price_rules", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  ruleType: text("rule_type").notNull(), // 'global', 'product', 'customer', 'customer_product'
+  customerId: varchar("customer_id").references(() => customers.id),
+  customerCategory: text("customer_category"), // customer category name for category-based rules
+  productId: varchar("product_id").references(() => products.id),
+  marginPercent: decimal("margin_percent", { precision: 7, scale: 2 }).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Legacy table - kept for backwards compatibility, will be deprecated
 // Customer-Product Margin table for specific margin rules per customer-product combination
 // Used in Advanced Price Rule feature to calculate sales prices
@@ -430,6 +446,12 @@ export const insertCustomerProductPriceRuleSchema = createInsertSchema(customerP
     effectiveFromDate: z.string().transform((str) => new Date(str)),
   });
 
+export const insertPriceRuleSchema = createInsertSchema(priceRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertProductSchemeSchema = createInsertSchema(
   productSchemes,
 ).omit({
@@ -678,7 +700,7 @@ export type InsertProductVariant = z.infer<typeof insertProductVariantSchema>;
 export type CustomerProductMargin = typeof customerProductMargins.$inferSelect;
 export type InsertCustomerProductMargin = z.infer<typeof insertCustomerProductMarginSchema>;
 
-// Price Rule Types
+// Price Rule Types (Legacy - kept for backward compatibility)
 export type GlobalPriceRule = typeof globalPriceRule.$inferSelect;
 export type InsertGlobalPriceRule = z.infer<typeof insertGlobalPriceRuleSchema>;
 export type ProductPriceRule = typeof productPriceRule.$inferSelect;
@@ -687,6 +709,10 @@ export type CustomerPriceRule = typeof customerPriceRule.$inferSelect;
 export type InsertCustomerPriceRule = z.infer<typeof insertCustomerPriceRuleSchema>;
 export type CustomerProductPriceRule = typeof customerProductPriceRule.$inferSelect;
 export type InsertCustomerProductPriceRule = z.infer<typeof insertCustomerProductPriceRuleSchema>;
+
+// Unified Price Rule Types
+export type PriceRule = typeof priceRules.$inferSelect;
+export type InsertPriceRule = z.infer<typeof insertPriceRuleSchema>;
 
 export type ProductScheme = typeof productSchemes.$inferSelect;
 export type InsertProductScheme = z.infer<typeof insertProductSchemeSchema>;
