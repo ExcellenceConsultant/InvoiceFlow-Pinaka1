@@ -375,23 +375,9 @@ function CreditMemoView() {
   .notes-box {
     background-color: white !important;
     background: white !important;
-    margin-left: 18px !important;
     border: none !important;
     padding: 0 !important;
     min-height: 0 !important;
-  }
-
-  .notes-line {
-    display: flex !important;
-    align-items: flex-start !important;
-    gap: 8px !important;
-    margin-bottom: 2px !important;
-  }
-
-  .notes-number {
-    font-weight: bold !important;
-    color: #000 !important;
-    min-width: 18px !important;
   }
 }
     `;
@@ -896,18 +882,32 @@ function CreditMemoView() {
               <div className="notes-section">
                 <div className="notes-label">Terms and Conditions:</div>
                 <div className="notes-box">
-                  {((creditMemo as any).notes || "")
-                    .split("\n")
-                    .filter((line: string) => line.trim())
-                    .map((line: string, idx: number) => {
-                      const cleanLine = line.replace(/^\d+\.\s*/, "").trim();
-                      return (
-                        <div className="notes-line" key={idx}>
-                          <span className="notes-number">{idx + 1}.</span>
-                          <span>{cleanLine}</span>
-                        </div>
-                      );
-                    })}
+                  {(() => {
+                    const lines = ((creditMemo as any).notes || "")
+                      .split("\n")
+                      .filter((line: string) => line.trim())
+                      .map((line: string) => line.replace(/^\d+\.\s*/, "").trim());
+                    const lastLine = lines[lines.length - 1] || "";
+                    const isSignOff = /sign|accept|agree/i.test(lastLine);
+                    const termLines = isSignOff ? lines.slice(0, -1) : lines;
+                    const signOffLine = isSignOff ? lastLine : null;
+                    return (
+                      <>
+                        <p style={{ margin: 0, lineHeight: 1.5 }}>
+                          {termLines.map((line: string, idx: number) => (
+                            <span key={idx}>
+                              <strong>({idx + 1})</strong> {line}{" "}
+                            </span>
+                          ))}
+                        </p>
+                        {signOffLine && (
+                          <p style={{ margin: "6px 0 0 0", lineHeight: 1.5 }}>
+                            By signing this invoice, we accept above terms &amp; Conditions.
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
