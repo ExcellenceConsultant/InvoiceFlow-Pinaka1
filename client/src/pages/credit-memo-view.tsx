@@ -922,7 +922,7 @@ function CreditMemoView() {
                   <span></span>
                 </div>
                 <div className="footer-company">
-                  Kitchen Express Overseas Inc
+                  Pinaka Foods, Inc.
                 </div>
               </div>
             </>
