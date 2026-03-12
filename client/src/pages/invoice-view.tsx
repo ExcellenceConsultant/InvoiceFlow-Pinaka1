@@ -969,7 +969,7 @@ function InvoiceView() {
                         </p>
                         {signOffLine && (
                           <p style={{ margin: "6px 0 0 0", lineHeight: 1.5 }}>
-                            By signing this invoice, we accept above terms &amp; Conditions.
+                            {signOffLine}
                           </p>
                         )}
                       </>
