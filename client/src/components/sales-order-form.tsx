@@ -426,7 +426,13 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                     <FormItem>
                       <FormLabel>Customer</FormLabel>
                       <Select
-                        onValueChange={field.onChange}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          const selectedCustomer = activeCustomers.find((c: any) => c.id === value);
+                          if (selectedCustomer?.contactPersonName) {
+                            form.setValue("purchaseOrder", selectedCustomer.contactPersonName);
+                          }
+                        }}
                         value={field.value}
                       >
                         <FormControl>
