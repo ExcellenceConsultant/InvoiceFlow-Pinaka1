@@ -303,6 +303,8 @@ function InvoiceView() {
 
 .summary-total {
   color: #000;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .notes-section {
@@ -374,6 +376,8 @@ function InvoiceView() {
 @media print {
   .summary-total {
     color: #000 !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -714,7 +718,7 @@ function InvoiceView() {
             {/* Invoice Details */}
             <div className="info-section">
               <div className="info-detail" style={{ fontWeight: 700, fontSize: "14px" }}>
-                Invoice No. : {invoice.invoiceNumber}
+                {(invoice as any).invoiceType === "payable" ? "Bill No." : "Invoice No."} : {invoice.invoiceNumber}
               </div>
               <div className="info-detail">
                 <strong>Invoice Date</strong> :{" "}
@@ -872,8 +876,8 @@ function InvoiceView() {
               <div className="summary-section">
                 {/* Left side - Weights and Amount in words */}
                 <div className="summary-left">
-                  <div>
-                    <strong>Total Units:</strong> {totalCartons}
+                  <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                    Total Units: {totalCartons}
                   </div>
                   <div>
                     <strong>Net Weight LBS:</strong> {netWeightLbs.toFixed(0)}{" "}

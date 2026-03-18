@@ -303,6 +303,8 @@ function CreditMemoView() {
 
 .summary-total {
   color: #000;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .notes-section {
@@ -356,6 +358,8 @@ function CreditMemoView() {
 @media print {
   .summary-total {
     color: #000 !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -667,8 +671,8 @@ function CreditMemoView() {
 
             {/* Credit Memo Details */}
             <div className="info-section">
-              <div className="info-detail">
-                <strong>Credit Memo No.</strong> : {creditMemo.creditMemoNumber}
+              <div className="info-detail" style={{ fontWeight: 700, fontSize: "14px" }}>
+                {(creditMemo as any).invoiceType === "payable" ? "Vendor Credit No." : "Credit Memo No."} : {creditMemo.creditMemoNumber}
               </div>
               <div className="info-detail">
                 <strong>Credit Memo Date</strong> :{" "}
