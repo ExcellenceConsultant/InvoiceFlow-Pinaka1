@@ -817,8 +817,8 @@ function CreditMemoView() {
               <div className="summary-section">
                 {/* Left side - Weights and Amount in words */}
                 <div className="summary-left">
-                  <div>
-                    <strong>Total Carton:</strong> {totalCartons}
+                  <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                    Total Unit: {totalCartons}
                   </div>
                   <div>
                     <strong>Net Weight LBS:</strong> {netWeightLbs.toFixed(0)}{" "}
