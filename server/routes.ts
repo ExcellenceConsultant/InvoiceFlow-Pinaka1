@@ -1517,7 +1517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               // AR Invoice (receivable): Reduce inventory (selling to customer)
               if (invoice.invoiceType === "receivable") {
-                newQty = currentProduct.qty - item.quantity;
+                newQty = parseFloat(String(currentProduct.qty)) - item.quantity;
                 console.log(
                   `Reducing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (sold ${item.quantity})`,
                 );
@@ -1530,7 +1530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               // AP Invoice (payable): Increase inventory (buying from supplier)
               else if (invoice.invoiceType === "payable") {
-                newQty = currentProduct.qty + item.quantity;
+                newQty = parseFloat(String(currentProduct.qty)) + parseFloat(String(item.quantity));
                 console.log(
                   `Increasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (purchased ${item.quantity})`,
                 );
@@ -1565,7 +1565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const currentProduct = await storage.getProduct(lineItem.productId);
             if (currentProduct) {
-              const newQty = currentProduct.qty - lineItem.quantity;
+              const newQty = parseFloat(String(currentProduct.qty)) - lineItem.quantity;
               console.log(
                 `Reducing inventory for free scheme item ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (free quantity ${lineItem.quantity})`,
               );
@@ -1734,7 +1734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
               const currentProduct = await storage.getProduct(item.productId);
               if (currentProduct) {
-                const newQty = currentProduct.qty - item.quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) - item.quantity;
                 const priceInfo = productPriceMap.get(item.productId);
                 const latestBasePrice = priceInfo?.basePrice || "0.00";
 
@@ -1771,7 +1771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
               const currentProduct = await storage.getProduct(item.productId);
               if (currentProduct) {
-                const newQty = currentProduct.qty + item.quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) + parseFloat(String(item.quantity));
                 const priceInfo = productPriceMap.get(item.productId);
                 const latestSalesPrice = priceInfo?.salesPrice || "0.00";
 
@@ -1868,7 +1868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Subtract the old quantity
                 const newQty = Math.max(
                   0,
-                  currentProduct.qty - oldItem.quantity,
+                  parseFloat(String(currentProduct.qty)) - oldItem.quantity,
                 );
                 console.log(
                   `Reverting old AP line item: Reducing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (removing ${oldItem.quantity})`,
@@ -1895,7 +1895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               );
               if (currentProduct) {
                 // Add back the old quantity
-                const newQty = currentProduct.qty + oldItem.quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) + parseFloat(String(oldItem.quantity));
                 console.log(
                   `Reverting old AR line item: Increasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (adding back ${oldItem.quantity})`,
                 );
@@ -2059,7 +2059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const currentProduct = await storage.getProduct(item.productId);
               if (currentProduct) {
                 // Add the new quantity
-                const newQty = currentProduct.qty + item.quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) + parseFloat(String(item.quantity));
                 console.log(
                   `Applying new AP line item: Increasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (adding ${item.quantity})`,
                 );
@@ -2087,7 +2087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const currentProduct = await storage.getProduct(item.productId);
               if (currentProduct) {
                 // Subtract the new quantity
-                const newQty = currentProduct.qty - item.quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) - item.quantity;
                 console.log(
                   `Applying new AR line item: Reducing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (removing ${item.quantity})`,
                 );
@@ -2257,7 +2257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               // AR Credit Memo (receivable): Increase inventory (returning goods from customer)
               if (createdCreditMemo.invoiceType === "receivable") {
-                const newQty = currentProduct.qty + quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) + quantity;
                 console.log(
                   `Increasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (credit memo returned ${quantity})`,
                 );
@@ -2269,7 +2269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               // AP Credit Memo (payable): Decrease inventory (returning goods to supplier)
               else if (createdCreditMemo.invoiceType === "payable") {
-                const newQty = currentProduct.qty - quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) - quantity;
                 console.log(
                   `Decreasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (credit memo returned ${quantity} to supplier)`,
                 );
@@ -2351,7 +2351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   typeof item.quantity === "string"
                     ? parseFloat(item.quantity)
                     : item.quantity;
-                const newQty = currentProduct.qty - quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) - quantity;
                 console.log(
                   `Reverting AR credit memo deletion: Decreasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (removing ${quantity})`,
                 );
@@ -2380,7 +2380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   typeof item.quantity === "string"
                     ? parseFloat(item.quantity)
                     : item.quantity;
-                const newQty = currentProduct.qty + quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) + quantity;
                 console.log(
                   `Reverting AP credit memo deletion: Increasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (adding back ${quantity})`,
                 );
@@ -2482,7 +2482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   typeof oldItem.quantity === "string"
                     ? parseFloat(oldItem.quantity)
                     : oldItem.quantity;
-                const newQty = currentProduct.qty - oldQuantity;
+                const newQty = parseFloat(String(currentProduct.qty)) - oldQuantity;
                 console.log(
                   `Reverting old AR credit memo line item: Decreasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (removing ${oldQuantity})`,
                 );
@@ -2509,7 +2509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   typeof oldItem.quantity === "string"
                     ? parseFloat(oldItem.quantity)
                     : oldItem.quantity;
-                const newQty = currentProduct.qty + oldQuantity;
+                const newQty = parseFloat(String(currentProduct.qty)) + oldQuantity;
                 console.log(
                   `Reverting old AP credit memo line item: Increasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (adding back ${oldQuantity})`,
                 );
@@ -2594,7 +2594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   typeof item.quantity === "string"
                     ? parseFloat(item.quantity)
                     : item.quantity;
-                const newQty = currentProduct.qty + quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) + quantity;
                 console.log(
                   `Applying new AR credit memo line item: Increasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (adding ${quantity})`,
                 );
@@ -2622,7 +2622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   typeof item.quantity === "string"
                     ? parseFloat(item.quantity)
                     : item.quantity;
-                const newQty = currentProduct.qty - quantity;
+                const newQty = parseFloat(String(currentProduct.qty)) - quantity;
                 console.log(
                   `Applying new AP credit memo line item: Decreasing inventory for product ${currentProduct.name}: ${currentProduct.qty} → ${newQty} (removing ${quantity})`,
                 );
@@ -4236,7 +4236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let lowStockCount = 0;
 
       for (const product of products) {
-        const qty = product.qty || 0;
+        const qty = parseFloat(String(product.qty || 0));
         totalStock += qty;
         // Count as low stock if quantity is 10 or less
         if (qty <= 10 && qty > 0) {
