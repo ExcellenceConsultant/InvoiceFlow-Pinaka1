@@ -1341,7 +1341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const item of allLineItems) {
         if (item.invoiceId) {
           const currentTotal = cartonsByInvoice.get(item.invoiceId) || 0;
-          cartonsByInvoice.set(item.invoiceId, currentTotal + (item.quantity || 0));
+          cartonsByInvoice.set(item.invoiceId, currentTotal + parseFloat(String(item.quantity || 0)));
         }
       }
       
@@ -5107,7 +5107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const item of allLineItems) {
         if (item.orderId) {
           const currentTotal = cartonsByOrder.get(item.orderId) || 0;
-          cartonsByOrder.set(item.orderId, currentTotal + (item.quantity || 0));
+          cartonsByOrder.set(item.orderId, currentTotal + parseFloat(String(item.quantity || 0)));
         }
       }
       
