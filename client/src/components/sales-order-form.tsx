@@ -592,12 +592,13 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                       <div className="col-span-2">
                         <Input
                           type="number"
-                          min="1"
+                          min="0.5"
+                          step="0.5"
                           value={item.quantity}
                           onChange={(e) =>
                             handleQuantityChange(
                               index,
-                              parseInt(e.target.value) || 1
+                              parseFloat(e.target.value) || 0.5
                             )
                           }
                           data-testid={`input-quantity-${index}`}

@@ -71,7 +71,7 @@ const lineItemSchema = z.object({
   productId: z.string().min(1, "Product is required"),
   variantId: z.string().optional(),
   description: z.string().min(1, "Description is required"),
-  quantity: z.number().min(1, "Quantity must be at least 1"),
+  quantity: z.number().min(0.5, "Quantity must be at least 0.5"),
   unitPrice: z.number().min(0, "Unit price must be non-negative"),
 });
 
@@ -1560,12 +1560,14 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                             </div>
                             <Input
                               type="number"
+                              min="0.5"
+                              step="0.5"
                               value={item.quantity}
                               onChange={(e) =>
                                 updateLineItem(
                                   index,
                                   "quantity",
-                                  parseInt(e.target.value) || 0,
+                                  parseFloat(e.target.value) || 0,
                                 )
                               }
                               className="h-8"

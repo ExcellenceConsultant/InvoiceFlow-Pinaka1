@@ -1206,12 +1206,14 @@ export default function CreditMemoForm({
                             </div>
                             <Input
                               type="number"
+                              min="0.5"
+                              step="0.5"
                               value={item.quantity}
                               onChange={(e) =>
                                 updateLineItem(
                                   index,
                                   "quantity",
-                                  parseInt(e.target.value) || 0,
+                                  parseFloat(e.target.value) || 0,
                                 )
                               }
                               className="h-8"
