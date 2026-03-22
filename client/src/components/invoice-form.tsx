@@ -1473,7 +1473,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                                             .includes(
                                               productSearchTerm.toLowerCase(),
                                             ) ||
-                                          (product.cartoonBarcode ?? "")
+                                          (product.itemCode ?? "")
                                             .toLowerCase()
                                             .includes(
                                               productSearchTerm.toLowerCase(),
@@ -1511,7 +1511,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                                           data-testid={`option-product-${product.id}`}
                                         >
                                           {product.name} -{" "}
-                                          {product.cartoonBarcode || "No Code"} (
+                                          {product.itemCode || "No Code"} (
                                           {product.category})
                                         </SelectItem>
                                       ))

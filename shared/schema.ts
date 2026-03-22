@@ -75,7 +75,7 @@ export const products = pgTable("products", {
   itemCode: text("item_code"), // Item Code
   packingSize: text("packing_size"), // Packing Size
   category: text("category"), // Category
-  qty: integer("qty").notNull().default(0), // Qty
+  qty: decimal("qty", { precision: 10, scale: 2 }).notNull().default("0"), // Qty
   basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(), // Base Price
   salesPrice: decimal("sales_price", { precision: 10, scale: 2 }), // Sales Price
   grossWeight: decimal("gross_weight", { precision: 10, scale: 3 }), // Gross Weight

@@ -1454,6 +1454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lineItemValidation = insertInvoiceLineItemSchema.safeParse({
           ...item,
           invoiceId: createdInvoice.id,
+          quantity: String(item.quantity ?? 0),
           marginPerCarton: snapshotMargin, // Always set from server-side snapshot
         });
 
@@ -1986,9 +1987,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Prepare line item data - preserve numeric values faithfully
-        // Schema uses integer for quantity, so use Math.round to handle any floats
         const rawQuantity = typeof item.quantity === 'number' ? item.quantity : Number(item.quantity);
-        const quantity = isNaN(rawQuantity) ? 0 : Math.round(rawQuantity);
+        const quantity = isNaN(rawQuantity) ? "0" : String(rawQuantity);
         
         const lineItemData = {
           invoiceId: invoiceId,
@@ -2223,6 +2223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lineItemValidation = insertCreditMemoLineItemSchema.safeParse({
           ...item,
           creditMemoId: createdCreditMemo.id,
+          quantity: String(item.quantity ?? 0),
         });
 
         if (lineItemValidation.success) {
@@ -2561,6 +2562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lineItemValidation = insertCreditMemoLineItemSchema.safeParse({
           ...item,
           creditMemoId: creditMemoId,
+          quantity: String(item.quantity ?? 0),
         });
 
         if (lineItemValidation.success) {
@@ -5202,6 +5204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lineItemValidation = insertOrderLineItemSchema.safeParse({
           ...item,
           orderId: createdOrder.id,
+          quantity: String(item.quantity ?? 0),
         });
 
         if (lineItemValidation.success) {
@@ -5305,6 +5308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const lineItemValidation = insertOrderLineItemSchema.safeParse({
             ...item,
             orderId: orderId,
+            quantity: String(item.quantity ?? 0),
           });
 
           if (lineItemValidation.success) {

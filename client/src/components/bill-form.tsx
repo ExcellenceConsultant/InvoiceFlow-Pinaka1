@@ -1402,7 +1402,7 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
                                           data-testid={`option-product-${product.id}`}
                                         >
                                           {product.name} -{" "}
-                                          {product.cartoonBarcode || "No Code"} (
+                                          {product.itemCode || "No Code"} (
                                           {product.category})
                                         </SelectItem>
                                       ))
