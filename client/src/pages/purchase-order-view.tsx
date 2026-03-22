@@ -207,6 +207,14 @@ export default function PurchaseOrderView() {
         margin-top: 3px;
       }
 
+      .totals-cartons-row {
+        display: flex;
+        justify-content: flex-start;
+        padding: 3px 0;
+        font-weight: 700;
+        font-size: 13px;
+      }
+
       .letter-footer {
         text-align: center;
         font-size: 16px;
@@ -475,9 +483,8 @@ export default function PurchaseOrderView() {
 
           {page.showSummary && (
             <div className="totals-section">
-              <div className="totals-row">
-                <div className="totals-label">Total Cartons:</div>
-                <div className="totals-value">{totalCartons}</div>
+              <div className="totals-cartons-row">
+                Total Cartons: {totalCartons}
               </div>
               <div className="totals-row">
                 <div className="totals-label">Subtotal:</div>
@@ -496,7 +503,7 @@ export default function PurchaseOrderView() {
                 </div>
               )}
               <div className="totals-row totals-grand">
-                <div className="totals-label">Total:</div>
+                <div className="totals-label">Total Amount:</div>
                 <div className="totals-value">{formatCurrency(total)}</div>
               </div>
             </div>
