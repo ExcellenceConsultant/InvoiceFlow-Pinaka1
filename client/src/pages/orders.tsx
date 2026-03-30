@@ -495,7 +495,7 @@ export default function Orders() {
               <div className="overflow-x-auto">
                 <table className="w-full" data-testid="table-orders">
                   <thead>
-                    <tr className="border-b [&>th]:sticky [&>th]:top-[172px] [&>th]:z-10 [&>th]:bg-card">
+                    <tr className="border-b">
                       <th
                         className="text-left py-3 px-4 cursor-pointer hover:bg-muted/50"
                         onClick={() => handleSort("orderNumber")}
