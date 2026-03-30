@@ -218,7 +218,7 @@ export default function OrderPackingSlip() {
       groupedItems[category] = [];
     }
     groupedItems[category].push(item);
-    totalCartons += item.quantity;
+    totalCartons += parseFloat(String(item.quantity || 0));
   });
 
   // Parse customer address
