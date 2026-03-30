@@ -522,8 +522,8 @@ export default function Inventory() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header + Stats + Filters - Sticky Panel */}
-      <div className="sticky top-14 z-20 bg-background pb-4 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-8 pt-6 shadow-sm">
+      {/* Header + Stats - scrolls with page */}
+      <div className="-mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-8 pt-6">
       {/* Header */}
       <div className="mb-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
@@ -740,9 +740,11 @@ export default function Inventory() {
           </CardContent>
         </Card>
       </div>
+      </div>
 
-      {/* Filters */}
-      <Card className="mb-6" data-testid="inventory-filters-card">
+      {/* Filters + Table Headings - Sticky Panel */}
+      <div className="sticky top-14 z-20 bg-background -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 pb-2 shadow-sm">
+      <Card className="mb-0" data-testid="inventory-filters-card">
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
@@ -886,7 +888,7 @@ export default function Inventory() {
             <div className="overflow-x-auto relative mx-6">
               <table className="w-full" data-testid="inventory-table">
                 <thead>
-                  <tr className="border-b border-border">
+                  <tr className="border-b border-border [&>th]:sticky [&>th]:top-[154px] [&>th]:bg-card [&>th]:z-10">
                     <th className="py-3 px-4 text-sm font-medium text-muted-foreground w-12">
                       <input 
                         type="checkbox"
