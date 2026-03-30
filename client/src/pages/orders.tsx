@@ -373,6 +373,8 @@ export default function Orders() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            {/* Sticky: Tabs + Filters */}
+            <div className="sticky top-14 z-20 bg-card -mx-6 px-6 pt-3 pb-3 shadow-sm">
             <Tabs
               value={activeTab}
               onValueChange={(value) => setActiveTab(value as "SO" | "PO")}
@@ -387,7 +389,7 @@ export default function Orders() {
               </TabsList>
             </Tabs>
 
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col md:flex-row gap-4 mt-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -475,6 +477,7 @@ export default function Orders() {
                 </PopoverContent>
               </Popover>
             </div>
+            </div>{/* end sticky */}
 
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -492,7 +495,7 @@ export default function Orders() {
               <div className="overflow-x-auto">
                 <table className="w-full" data-testid="table-orders">
                   <thead>
-                    <tr className="border-b">
+                    <tr className="border-b [&>th]:sticky [&>th]:top-[172px] [&>th]:z-10 [&>th]:bg-card">
                       <th
                         className="text-left py-3 px-4 cursor-pointer hover:bg-muted/50"
                         onClick={() => handleSort("orderNumber")}
