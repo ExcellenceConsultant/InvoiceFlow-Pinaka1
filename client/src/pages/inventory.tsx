@@ -885,10 +885,10 @@ export default function Inventory() {
               ))}
             </div>
           ) : filteredProducts.length > 0 ? (
-            <div className="overflow-x-auto [overflow-y:clip] relative mx-6">
+            <div className="overflow-auto max-h-[calc(100vh-240px)] mx-6">
               <table className="w-full" data-testid="inventory-table">
                 <thead>
-                  <tr className="border-b border-border [&>th]:sticky [&>th]:top-[154px] [&>th]:bg-card [&>th]:z-10">
+                  <tr className="border-b border-border [&>th]:sticky [&>th]:top-0 [&>th]:bg-card [&>th]:z-10">
                     <th className="py-3 px-4 text-sm font-medium text-muted-foreground w-12">
                       <input 
                         type="checkbox"
