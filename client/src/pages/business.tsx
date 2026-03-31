@@ -1185,10 +1185,10 @@ export default function Business() {
                 ))}
               </div>
             ) : filteredInvoices.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-auto max-h-[calc(100vh-240px)]">
                 <table className="w-full" data-testid="invoices-table">
                   <thead>
-                    <tr className="border-b border-border">
+                    <tr className="border-b border-border [&>th]:sticky [&>th]:top-0 [&>th]:bg-card [&>th]:z-10">
                       <th className="py-3 px-4 text-sm font-medium text-muted-foreground w-12">
                         <input
                           type="checkbox"
