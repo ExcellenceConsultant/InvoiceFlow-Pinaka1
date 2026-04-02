@@ -63,6 +63,7 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
   }>>([]);
   const [lineItemsLoaded, setLineItemsLoaded] = useState(false);
   const [lineItemCategoryFilters, setLineItemCategoryFilters] = useState<string[]>([]);
+  const [defaultCategoryFilter, setDefaultCategoryFilter] = useState<string>("all");
 
   const createEmptyLineItem = () => ({
     productId: "",
@@ -291,7 +292,7 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
 
   const addLineItem = () => {
     setLineItems([...lineItems, createEmptyLineItem()]);
-    setLineItemCategoryFilters([...lineItemCategoryFilters, "all"]);
+    setLineItemCategoryFilters([...lineItemCategoryFilters, defaultCategoryFilter]);
   };
 
   const removeLineItem = (index: number) => {
@@ -591,16 +592,29 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
                 </div>
 
                 {/* Add Item button below products */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addLineItem}
-                  data-testid="button-add-line-item"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Item
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Select value={defaultCategoryFilter} onValueChange={setDefaultCategoryFilter}>
+                    <SelectTrigger className="h-9 w-40 text-sm" data-testid="select-default-category">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {Array.from(new Set(products?.map((p: any) => p.category).filter(Boolean))).sort((a: any, b: any) => a.localeCompare(b)).map((cat: any) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addLineItem}
+                    data-testid="button-add-line-item"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Item
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
