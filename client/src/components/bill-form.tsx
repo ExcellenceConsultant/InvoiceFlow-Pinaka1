@@ -106,7 +106,7 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
     [key: number]: any[];
   }>({});
   const [manualFreeItems, setManualFreeItems] = useState<any[]>([]); // For total quantity-based schemes
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [lineItemCategoryFilters, setLineItemCategoryFilters] = useState<string[]>([]);
   const [schemePendingSelections, setSchemePendingSelections] = useState<{
     [schemeId: string]: { productId: string; quantity: number };
   }>({});
@@ -562,18 +562,20 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
         packingSize: "",
         grossWeightKgs: 0,
         netWeightKgs: 0,
-        category: "", // keep category empty initially
+        category: "",
         isSchemeDescription: false,
         schemeDescription: "",
         stockQuantity: 0,
       },
     ]);
-    setProductSearchTerm(""); // Clear search input when adding new item
+    setLineItemCategoryFilters([...lineItemCategoryFilters, "all"]);
+    setProductSearchTerm("");
   };
 
   const removeLineItem = (index: number) => {
     const updatedItems = lineItems.filter((_, i) => i !== index);
     setLineItems(updatedItems);
+    setLineItemCategoryFilters(lineItemCategoryFilters.filter((_, i) => i !== index));
 
     // Remove associated scheme items
     const updatedSchemeItems = { ...showSchemeItems };
@@ -1146,39 +1148,6 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
                   <label className="text-sm font-medium text-foreground">
                     Invoice Items
                   </label>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-muted-foreground">
-                      Filter by Category:
-                    </label>
-                    <Select
-                      value={categoryFilter}
-                      onValueChange={setCategoryFilter}
-                    >
-                      <SelectTrigger
-                        className="w-32 h-8"
-                        data-testid="select-category-filter"
-                      >
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {Array.from(
-                          new Set(
-                            products
-                              ?.map((p: any) => p.category)
-                              .filter(Boolean),
-                          ),
-                        ).sort((a: any, b: any) => a.localeCompare(b)).map((category) => (
-                          <SelectItem
-                            key={category as string}
-                            value={category as string}
-                          >
-                            {category as string}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -1227,6 +1196,24 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
                           data-testid={`line-item-${index}`}
                         >
                           <div className="col-span-3">
+                            <Select
+                              value={lineItemCategoryFilters[index] || "all"}
+                              onValueChange={(v) => {
+                                const f = [...lineItemCategoryFilters];
+                                f[index] = v;
+                                setLineItemCategoryFilters(f);
+                              }}
+                            >
+                              <SelectTrigger className="h-7 text-xs mb-1" data-testid={`select-cat-filter-${index}`}>
+                                <SelectValue placeholder="All Categories" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Categories</SelectItem>
+                                {Array.from(new Set(products?.map((p: any) => p.category).filter(Boolean))).sort((a: any, b: any) => a.localeCompare(b)).map((cat: any) => (
+                                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <label className="block text-xs text-muted-foreground mb-1">
                               Product
                             </label>
@@ -1345,14 +1332,15 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
                                   </SelectItem>
                                 ) : (
                                   (() => {
+                                    const rowCatFilter = lineItemCategoryFilters[index] || "all";
                                     // Filter by category
                                     const categoryFiltered =
-                                      categoryFilter === "all"
+                                      rowCatFilter === "all"
                                         ? products
                                         : products?.filter(
                                             (product: any) =>
                                               product.category ===
-                                              categoryFilter,
+                                              rowCatFilter,
                                           );
 
                                     // Filter by search term (case-insensitive substring match)

@@ -62,7 +62,7 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
     category: string;
   }>>([]);
   const [lineItemsLoaded, setLineItemsLoaded] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [lineItemCategoryFilters, setLineItemCategoryFilters] = useState<string[]>([]);
 
   const createEmptyLineItem = () => ({
     productId: "",
@@ -124,12 +124,10 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
     return Array.from(new Set(cats)).sort();
   }, [products]);
 
-  // Filter products by selected category
-  const filteredProducts = useMemo(() => {
+  const sortedProducts = useMemo(() => {
     if (!products) return [];
-    const filtered = categoryFilter === "all" ? products : products.filter((p: any) => p.category === categoryFilter);
-    return [...filtered].sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
-  }, [products, categoryFilter]);
+    return [...products].sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+  }, [products]);
 
   useEffect(() => {
     if (!isEditMode && nextNumberData?.nextNumber) {
@@ -341,15 +339,18 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
 
   const addLineItem = () => {
     setLineItems([...lineItems, createEmptyLineItem()]);
+    setLineItemCategoryFilters([...lineItemCategoryFilters, "all"]);
   };
 
   const removeLineItem = (index: number) => {
     const newLineItems = lineItems.filter((_, i) => i !== index);
-    // Keep at least one empty line item if removing the last one
+    const newFilters = lineItemCategoryFilters.filter((_, i) => i !== index);
     if (newLineItems.length === 0) {
       setLineItems([createEmptyLineItem()]);
+      setLineItemCategoryFilters(["all"]);
     } else {
       setLineItems(newLineItems);
+      setLineItemCategoryFilters(newFilters);
     }
   };
 
@@ -537,22 +538,6 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
               <div className="space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <h3 className="text-lg font-semibold">Line Items</h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Filter by Category:</span>
-                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
-                        <SelectValue placeholder="Filter by category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {categories.map((category: string) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
 
                 {/* Table Header */}
@@ -570,7 +555,25 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                       key={index}
                       className="grid grid-cols-12 gap-2 items-center"
                     >
-                      <div className="col-span-5">
+                      <div className="col-span-5 space-y-1">
+                        <Select
+                          value={lineItemCategoryFilters[index] || "all"}
+                          onValueChange={(v) => {
+                            const f = [...lineItemCategoryFilters];
+                            f[index] = v;
+                            setLineItemCategoryFilters(f);
+                          }}
+                        >
+                          <SelectTrigger className="h-7 text-xs" data-testid={`select-cat-filter-${index}`}>
+                            <SelectValue placeholder="All Categories" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Categories</SelectItem>
+                            {categories.map((cat: string) => (
+                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <Select
                           value={item.productId}
                           onValueChange={(value) =>
@@ -581,7 +584,10 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
-                            {filteredProducts?.map((product: any) => (
+                            {(lineItemCategoryFilters[index] === "all" || !lineItemCategoryFilters[index]
+                              ? sortedProducts
+                              : sortedProducts?.filter((p: any) => p.category === lineItemCategoryFilters[index])
+                            )?.map((product: any) => (
                               <SelectItem key={product.id} value={product.id}>
                                 {product.name} ({product.itemCode || "No code"})
                               </SelectItem>
