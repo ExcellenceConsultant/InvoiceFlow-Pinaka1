@@ -505,24 +505,6 @@ export default function PurchaseOrderForm({ order, onClose, onSuccess }: Props) 
                     >
                       <div className="col-span-5 space-y-1">
                         <Select
-                          value={lineItemCategoryFilters[index] || "all"}
-                          onValueChange={(v) => {
-                            const f = [...lineItemCategoryFilters];
-                            f[index] = v;
-                            setLineItemCategoryFilters(f);
-                          }}
-                        >
-                          <SelectTrigger className="h-7 text-xs" data-testid={`select-cat-filter-${index}`}>
-                            <SelectValue placeholder="All Categories" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Categories</SelectItem>
-                            {categories.map((cat: string) => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select
                           value={item.productId}
                           onValueChange={(value) =>
                             handleProductChange(index, value)

@@ -1268,24 +1268,6 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                           data-testid={`line-item-${index}`}
                         >
                           <div className="col-span-3">
-                            <Select
-                              value={lineItemCategoryFilters[index] || "all"}
-                              onValueChange={(v) => {
-                                const f = [...lineItemCategoryFilters];
-                                f[index] = v;
-                                setLineItemCategoryFilters(f);
-                              }}
-                            >
-                              <SelectTrigger className="h-7 text-xs mb-1" data-testid={`select-cat-filter-${index}`}>
-                                <SelectValue placeholder="All Categories" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All Categories</SelectItem>
-                                {Array.from(new Set(products?.map((p: any) => p.category).filter(Boolean))).sort((a: any, b: any) => a.localeCompare(b)).map((cat: any) => (
-                                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
                             <label className="block text-xs text-muted-foreground mb-1">
                               Product
                             </label>
