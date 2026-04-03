@@ -215,10 +215,38 @@ export default function PurchaseOrderView() {
         font-size: 13px;
       }
 
+      .letterhead-header {
+        text-align: center;
+        padding-bottom: 14px;
+        margin-bottom: 16px;
+        border-bottom: 2px solid #222;
+      }
+
+      .letterhead-company {
+        font-size: 22px;
+        font-weight: bold;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+      }
+
+      .letterhead-address {
+        font-size: 12px;
+        color: #333;
+        margin-bottom: 3px;
+      }
+
+      .letterhead-contact {
+        font-size: 12px;
+        color: #333;
+      }
+
       .letter-footer {
         text-align: center;
-        font-size: 16px;
+        font-size: 13px;
         margin-top: 30px;
+        padding-top: 10px;
+        border-top: 1px solid #ccc;
+        color: #333;
       }
     `;
     document.head.appendChild(style);
@@ -376,6 +404,15 @@ export default function PurchaseOrderView() {
             pageIndex < pages.length - 1 ? "page-break" : ""
           }`}
         >
+          {/* Letterhead Header */}
+          <div className="letterhead-header">
+            <div className="letterhead-company">Pinaka Foods, Inc.</div>
+            <div className="letterhead-address">5103 Custer St, Piscataway, NJ 08854-4703</div>
+            <div className="letterhead-contact">
+              +1 (908) 217-5834 &nbsp;&nbsp;&nbsp; sales@pinakafoods.com &nbsp;&nbsp;&nbsp; www.pinakafoods.com
+            </div>
+          </div>
+
           <div className="po-header">PURCHASE ORDER</div>
 
           <div className="po-info-grid">
@@ -515,8 +552,8 @@ export default function PurchaseOrderView() {
             </div>
           )}
 
-          <div className="letter-footer print-hide-content">
-            <strong>Letter Head Footer</strong>
+          <div className="letter-footer">
+            Warehouse Address : 140 Ethel Road West, Unit # H, Piscataway, NJ 08854
           </div>
         </div>
       ))}
