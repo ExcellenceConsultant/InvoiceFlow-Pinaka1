@@ -1315,7 +1315,7 @@ export default function BillForm({ bill, onClose, onSuccess }: Props) {
                                   </SelectItem>
                                 ) : (
                                   (() => {
-                                    const rowCatFilter = lineItemCategoryFilters[index] || "all";
+                                    const rowCatFilter = defaultCategoryFilter || "all";
                                     // Filter by category
                                     const categoryFiltered =
                                       rowCatFilter === "all"

@@ -1424,7 +1424,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
                                   </SelectItem>
                                 ) : (
                                   (() => {
-                                    const rowCatFilter = lineItemCategoryFilters[index] || "all";
+                                    const rowCatFilter = defaultCategoryFilter || "all";
                                     // Filter by category
                                     const categoryFiltered =
                                       rowCatFilter === "all"

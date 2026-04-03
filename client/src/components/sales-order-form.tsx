@@ -567,9 +567,9 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(lineItemCategoryFilters[index] === "all" || !lineItemCategoryFilters[index]
+                            {(defaultCategoryFilter === "all" || !defaultCategoryFilter
                               ? sortedProducts
-                              : sortedProducts?.filter((p: any) => p.category === lineItemCategoryFilters[index])
+                              : sortedProducts?.filter((p: any) => p.category === defaultCategoryFilter)
                             )?.map((product: any) => (
                               <SelectItem key={product.id} value={product.id}>
                                 {product.name} ({product.itemCode || "No code"})
