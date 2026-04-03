@@ -457,6 +457,7 @@ export default function PurchaseOrderView() {
                 </span>
               </div>
             </div>
+            <div style={{ width: "80px", flexShrink: 0 }} />
           </div>
 
           <div className="po-header">PURCHASE ORDER</div>
