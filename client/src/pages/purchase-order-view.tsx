@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { formatDateWithoutTimezone } from "@/lib/dateUtils";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Globe, Mail, Phone, Printer } from "lucide-react";
 import { useEffect } from "react";
 import { Link, useParams } from "wouter";
+import pinakaLogo from "@/assets/pinaka-logo.jpg";
 
 interface OrderLineItem {
   id: string;
@@ -84,6 +85,17 @@ export default function PurchaseOrderView() {
 
         .po-table th {
           background-color: #f5f5f5 !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        .letterhead-logo {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        .letterhead-company {
+          color: #2e7d32 !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
@@ -216,28 +228,51 @@ export default function PurchaseOrderView() {
       }
 
       .letterhead-header {
-        text-align: center;
+        display: flex;
+        align-items: center;
         padding-bottom: 14px;
         margin-bottom: 16px;
-        border-bottom: 2px solid #222;
+        border-bottom: 2px solid #ddd;
+      }
+
+      .letterhead-logo {
+        width: 80px;
+        height: 80px;
+        object-fit: contain;
+        margin-right: 24px;
+        flex-shrink: 0;
+      }
+
+      .letterhead-info {
+        flex: 1;
+        text-align: center;
       }
 
       .letterhead-company {
-        font-size: 22px;
+        font-size: 20px;
         font-weight: bold;
-        letter-spacing: 0.5px;
-        margin-bottom: 4px;
+        color: #2e7d32;
+        margin-bottom: 3px;
       }
 
       .letterhead-address {
         font-size: 12px;
-        color: #333;
-        margin-bottom: 3px;
+        color: #555;
+        margin-bottom: 6px;
       }
 
       .letterhead-contact {
-        font-size: 12px;
+        font-size: 11px;
         color: #333;
+        display: flex;
+        justify-content: center;
+        gap: 18px;
+      }
+
+      .contact-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
       }
 
       .letter-footer {
@@ -406,10 +441,21 @@ export default function PurchaseOrderView() {
         >
           {/* Letterhead Header */}
           <div className="letterhead-header">
-            <div className="letterhead-company">Pinaka Foods, Inc.</div>
-            <div className="letterhead-address">5103 Custer St, Piscataway, NJ 08854-4703</div>
-            <div className="letterhead-contact">
-              +1 (908) 217-5834 &nbsp;&nbsp;&nbsp; sales@pinakafoods.com &nbsp;&nbsp;&nbsp; www.pinakafoods.com
+            <img src={pinakaLogo} alt="Pinaka Foods" className="letterhead-logo" />
+            <div className="letterhead-info">
+              <div className="letterhead-company">Pinaka Foods, Inc.</div>
+              <div className="letterhead-address">5103 Custer St, Piscataway, NJ 08854-4703</div>
+              <div className="letterhead-contact">
+                <span className="contact-item">
+                  <Phone size={11} /> +1 (908) 217-5834
+                </span>
+                <span className="contact-item">
+                  <Mail size={11} /> sales@pinakafoods.com
+                </span>
+                <span className="contact-item">
+                  <Globe size={11} /> www.pinakafoods.com
+                </span>
+              </div>
             </div>
           </div>
 
