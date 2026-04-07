@@ -1194,18 +1194,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // TEMPORARY: One-time endpoint to clear all QB sync IDs so inventory can be re-synced
-  app.post("/api/admin/unsync-quickbooks-products", async (req, res) => {
-    try {
-      const result = await db.execute(
-        sql`UPDATE products SET quickbooks_item_id = NULL WHERE quickbooks_item_id IS NOT NULL RETURNING id, name, item_code`
-      );
-      const rows = result.rows as any[];
-      res.json({ success: true, cleared: rows.length, products: rows });
-    } catch (err: any) {
-      res.status(500).json({ message: "Failed to clear QB sync", error: err.message });
-    }
-  });
 
   app.delete("/api/products", isAuthenticated, async (req, res) => {
     try {
