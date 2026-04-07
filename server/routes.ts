@@ -2690,52 +2690,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!item.productId) continue;
           const product = await storage.getProduct(item.productId);
           if (product && !product.quickbooksItemId) {
+            // Skip products without an item code — sync only by exact item code
+            if (!product.itemCode) continue;
             try {
-              // Try to find existing item by SKU (item code) first
-              let existingItem = null;
-              if (product.itemCode) {
-                existingItem = await quickBooksService.findItemBySKU(
-                  validQbConfig.accessToken,
-                  validQbConfig.companyId,
-                  product.itemCode,
-                );
-              }
-
-              // If not found by SKU, try by name
-              if (!existingItem) {
-                existingItem = await quickBooksService.findItemByName(
-                  validQbConfig.accessToken,
-                  validQbConfig.companyId,
-                  product.name,
-                );
-              }
+              // Find existing item by exact SKU (item code) only — no name fallback
+              const existingItem = await quickBooksService.findItemBySKU(
+                validQbConfig.accessToken,
+                validQbConfig.companyId,
+                product.itemCode,
+              );
 
               if (existingItem) {
-                existingItem = await quickBooksService.reactivateItemIfNeeded(
+                const reactivated = await quickBooksService.reactivateItemIfNeeded(
                   validQbConfig.accessToken,
                   validQbConfig.companyId,
                   existingItem,
                 );
                 await storage.updateProduct(product.id, {
-                  quickbooksItemId: existingItem.Id,
+                  quickbooksItemId: reactivated.Id,
                 });
               } else {
                 const qbItemData: any = {
                   Name: product.name,
-                  Type: product.itemCode ? "Inventory" : "Service",
+                  Type: "Inventory",
+                  Sku: product.itemCode,
+                  IncomeAccountRef: { value: "79" },
+                  ExpenseAccountRef: { value: "80" },
+                  AssetAccountRef: { value: "81" },
+                  TrackQtyOnHand: true,
+                  QtyOnHand: 0,
+                  InvStartDate: new Date().toISOString().split("T")[0],
                 };
-
-                if (product.itemCode) {
-                  qbItemData.Sku = product.itemCode;
-                  qbItemData.IncomeAccountRef = { value: "79" };
-                  qbItemData.ExpenseAccountRef = { value: "80" };
-                  qbItemData.AssetAccountRef = { value: "81" };
-                  qbItemData.TrackQtyOnHand = true;
-                  qbItemData.QtyOnHand = 0;
-                  qbItemData.InvStartDate = new Date()
-                    .toISOString()
-                    .split("T")[0];
-                }
 
                 const qbItem = await quickBooksService.createItem(
                   validQbConfig.accessToken,
@@ -3393,24 +3378,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Ensure tokens are valid and refresh if needed
         const validQbConfig = await ensureValidTokens();
 
-        // Try to find existing item by SKU (item code) first
-        let existingItem = null;
-        if (product.itemCode) {
-          existingItem = await quickBooksService.findItemBySKU(
-            validQbConfig.accessToken,
-            validQbConfig.companyId,
-            product.itemCode,
-          );
+        // Only sync products that have an item code — no name fallback
+        if (!product.itemCode) {
+          return res.status(400).json({
+            message: "Product has no item code. Sync requires an exact item code match with QuickBooks.",
+          });
         }
 
-        // If not found by SKU, try by name
-        if (!existingItem) {
-          existingItem = await quickBooksService.findItemByName(
-            validQbConfig.accessToken,
-            validQbConfig.companyId,
-            product.name,
-          );
-        }
+        // Find existing item by exact SKU (item code) only — no name fallback
+        const existingItem = await quickBooksService.findItemBySKU(
+          validQbConfig.accessToken,
+          validQbConfig.companyId,
+          product.itemCode,
+        );
 
         let qbItem;
         if (existingItem) {
@@ -3422,18 +3402,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           const qbItemData: any = {
             Name: product.name,
-            Type: product.itemCode ? "Inventory" : "Service",
+            Type: "Inventory",
+            Sku: product.itemCode,
+            IncomeAccountRef: { value: "79" },
+            ExpenseAccountRef: { value: "80" },
+            AssetAccountRef: { value: "81" },
+            TrackQtyOnHand: true,
+            QtyOnHand: 0,
+            InvStartDate: new Date().toISOString().split("T")[0],
           };
-
-          if (product.itemCode) {
-            qbItemData.Sku = product.itemCode;
-            qbItemData.IncomeAccountRef = { value: "79" };
-            qbItemData.ExpenseAccountRef = { value: "80" };
-            qbItemData.AssetAccountRef = { value: "81" };
-            qbItemData.TrackQtyOnHand = true;
-            qbItemData.QtyOnHand = 0;
-            qbItemData.InvStartDate = new Date().toISOString().split("T")[0];
-          }
 
           qbItem = await quickBooksService.createItem(
             validQbConfig.accessToken,
@@ -3544,52 +3521,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!item.productId) continue;
           const product = await storage.getProduct(item.productId);
           if (product && !product.quickbooksItemId) {
+            // Skip products without an item code — sync only by exact item code
+            if (!product.itemCode) continue;
             try {
-              // Try to find existing item by SKU (item code) first
-              let existingItem = null;
-              if (product.itemCode) {
-                existingItem = await quickBooksService.findItemBySKU(
-                  validQbConfig.accessToken,
-                  validQbConfig.companyId,
-                  product.itemCode,
-                );
-              }
-
-              // If not found by SKU, try by name
-              if (!existingItem) {
-                existingItem = await quickBooksService.findItemByName(
-                  validQbConfig.accessToken,
-                  validQbConfig.companyId,
-                  product.name,
-                );
-              }
+              // Find existing item by exact SKU (item code) only — no name fallback
+              const existingItem = await quickBooksService.findItemBySKU(
+                validQbConfig.accessToken,
+                validQbConfig.companyId,
+                product.itemCode,
+              );
 
               if (existingItem) {
-                existingItem = await quickBooksService.reactivateItemIfNeeded(
+                const reactivated = await quickBooksService.reactivateItemIfNeeded(
                   validQbConfig.accessToken,
                   validQbConfig.companyId,
                   existingItem,
                 );
                 await storage.updateProduct(product.id, {
-                  quickbooksItemId: existingItem.Id,
+                  quickbooksItemId: reactivated.Id,
                 });
               } else {
                 const qbItemData: any = {
                   Name: product.name,
-                  Type: product.itemCode ? "Inventory" : "Service",
+                  Type: "Inventory",
+                  Sku: product.itemCode,
+                  IncomeAccountRef: { value: "79" },
+                  ExpenseAccountRef: { value: "80" },
+                  AssetAccountRef: { value: "81" },
+                  TrackQtyOnHand: true,
+                  QtyOnHand: 0,
+                  InvStartDate: new Date().toISOString().split("T")[0],
                 };
-
-                if (product.itemCode) {
-                  qbItemData.Sku = product.itemCode;
-                  qbItemData.IncomeAccountRef = { value: "79" };
-                  qbItemData.ExpenseAccountRef = { value: "80" };
-                  qbItemData.AssetAccountRef = { value: "81" };
-                  qbItemData.TrackQtyOnHand = true;
-                  qbItemData.QtyOnHand = 0;
-                  qbItemData.InvStartDate = new Date()
-                    .toISOString()
-                    .split("T")[0];
-                }
 
                 const qbItem = await quickBooksService.createItem(
                   validQbConfig.accessToken,

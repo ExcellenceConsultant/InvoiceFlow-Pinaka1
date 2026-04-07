@@ -41,7 +41,7 @@ Implements OAuth 2.0 integration with QuickBooks for accessing APIs, including s
   - **User-Scoped**: All pricing queries are filtered by userId for multi-tenant isolation
   - **API Endpoints**: `/api/price-rules` (unified CRUD), `/api/pricing/calculate`, `/api/pricing/calculate-batch`, `/api/pricing/global-margin`
 - **QuickBooks Integration**: 
-  - **Inventory Sync**: Products sync by SKU (item code) first for accurate matching, then by name as fallback. When item code exists, products are created as Inventory items with SKU tracking in QuickBooks. Products without item codes are created as Service items. This prevents duplicates and ensures proper inventory tracking.
+  - **Inventory Sync**: Products sync by exact item code (SKU) only — no name fallback. Products without an item code are skipped entirely during sync. When an item code matches exactly in QuickBooks, it links to the existing QB item; if not found, a new Inventory item is created with the SKU. This ensures strict item code-based inventory matching.
   - **Direct Invoice/Bill Posting**: Endpoint `/api/invoices/:id/post-to-quickbooks` posts actual QB invoices (AR) or bills (AP) with all line items, automatically syncing products by item code first. AR invoices use `SalesItemLineDetail` and AP bills use `ItemBasedExpenseLineDetail` to properly reference inventory items.
   - **Automatic Customer/Vendor Sync**: Finds existing customers/vendors by name or creates new ones as needed.
   - **Note**: Journal Entry integration has been deprecated and removed. Only direct invoice/bill posting is supported.
