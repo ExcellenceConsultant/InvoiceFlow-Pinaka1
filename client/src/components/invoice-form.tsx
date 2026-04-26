@@ -23,7 +23,7 @@ import { formatCurrency } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Gift, NotebookPen, Plus, Save, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -218,30 +218,40 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
     enabled: isEditMode && !!invoice?.id,
   });
 
-  // Fetch next AR invoice number (only when creating new AR invoice)
-  const { data: nextInvoiceNumberData } = useQuery<{ nextNumber: string }>({
-    queryKey: ["/api/invoices/next-number"],
-    enabled: !isEditMode, // Only fetch when creating new invoice
-  });
-
   // Fetch all invoices to check for duplicates
   const { data: allInvoices } = useQuery<any[]>({
     queryKey: ["/api/invoices"],
   });
 
+  // Compute next AR invoice number from already user-scoped allInvoices data
+  const nextInvoiceNumber = useMemo(() => {
+    if (!allInvoices) return null;
+    const arInvoices = allInvoices.filter((inv) => inv.invoiceType === "receivable");
+    if (arInvoices.length === 0) return "1";
+    const maxNum = arInvoices.reduce((max, inv) => {
+      const digits = (inv.invoiceNumber || "").replace(/\D/g, "");
+      if (digits.length > 0 && digits.length <= 6) {
+        const n = parseInt(digits, 10);
+        return n > max ? n : max;
+      }
+      return max;
+    }, 0);
+    return (maxNum + 1).toString();
+  }, [allInvoices]);
+
   // Set invoice number based on invoice type (only for new invoices)
   useEffect(() => {
     if (!isEditMode) {
       const invoiceType = form.watch("invoiceType");
-      if (invoiceType === "receivable" && nextInvoiceNumberData?.nextNumber) {
+      if (invoiceType === "receivable" && nextInvoiceNumber) {
         // Auto-populate with next sequential number for AR invoices
-        form.setValue("invoiceNumber", nextInvoiceNumberData.nextNumber);
+        form.setValue("invoiceNumber", nextInvoiceNumber);
       } else if (invoiceType === "payable") {
         // Clear invoice number for AP invoices (manual entry)
         form.setValue("invoiceNumber", "");
       }
     }
-  }, [isEditMode, nextInvoiceNumberData, form]);
+  }, [isEditMode, nextInvoiceNumber, form]);
 
   // Watch invoice type changes to update invoice number accordingly
   useEffect(() => {
@@ -250,9 +260,9 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
         if (name === "invoiceType") {
           if (
             value.invoiceType === "receivable" &&
-            nextInvoiceNumberData?.nextNumber
+            nextInvoiceNumber
           ) {
-            form.setValue("invoiceNumber", nextInvoiceNumberData.nextNumber);
+            form.setValue("invoiceNumber", nextInvoiceNumber);
             setInvoiceNumberError(""); // Clear error when switching to AR
           } else if (value.invoiceType === "payable") {
             form.setValue("invoiceNumber", "");
@@ -262,7 +272,7 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
       });
       return () => subscription.unsubscribe();
     }
-  }, [isEditMode, nextInvoiceNumberData, form]);
+  }, [isEditMode, nextInvoiceNumber, form]);
 
   // Watch invoice number for duplicate detection (AR invoices only)
   useEffect(() => {
