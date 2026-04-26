@@ -1360,6 +1360,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/invoices/next-number", isAuthenticated, async (req, res) => {
     try {
+      const user = req.user as any;
+      const userId = user.userId;
       const result = await db.execute(sql`
         SELECT COALESCE(
           MAX(
@@ -1372,6 +1374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ) + 1 AS next_number
         FROM invoices
         WHERE invoice_type = 'receivable'
+          AND user_id = ${userId}
       `);
       const nextNumber = result.rows?.[0]?.next_number || 1;
       res.json({ nextNumber: nextNumber.toString() });
