@@ -1366,8 +1366,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT COALESCE(
           MAX(
             CASE 
-              WHEN regexp_replace(invoice_number, '[^0-9]', '', 'g') ~ '^[0-9]{1,6}$'
-              THEN CAST(regexp_replace(invoice_number, '[^0-9]', '', 'g') AS INTEGER)
+              WHEN invoice_number ~ '^[0-9]{1,6}$'
+              THEN CAST(invoice_number AS INTEGER)
               ELSE 0
             END
           ), 0

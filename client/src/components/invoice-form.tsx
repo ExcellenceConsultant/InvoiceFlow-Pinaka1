@@ -224,14 +224,16 @@ export default function InvoiceForm({ invoice, onClose, onSuccess }: Props) {
   });
 
   // Compute next AR invoice number from already user-scoped allInvoices data
+  // Only consider purely numeric invoice numbers (e.g. "26231") — ignore
+  // hyphenated or prefixed ones like "26207-1" which would corrupt the max.
   const nextInvoiceNumber = useMemo(() => {
     if (!allInvoices) return null;
     const arInvoices = allInvoices.filter((inv) => inv.invoiceType === "receivable");
     if (arInvoices.length === 0) return "1";
     const maxNum = arInvoices.reduce((max, inv) => {
-      const digits = (inv.invoiceNumber || "").replace(/\D/g, "");
-      if (digits.length > 0 && digits.length <= 6) {
-        const n = parseInt(digits, 10);
+      const num = inv.invoiceNumber || "";
+      if (/^\d{1,6}$/.test(num)) {
+        const n = parseInt(num, 10);
         return n > max ? n : max;
       }
       return max;
