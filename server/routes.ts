@@ -1024,79 +1024,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const user = (req as any).user;
-        
-        // Fetch all data in parallel for faster performance
-        const [products, invoices, creditMemos, allInvoiceLineItems, allCreditMemoLineItems] = await Promise.all([
-          storage.getProducts(user.userId),
-          storage.getInvoices(user.userId),
-          storage.getCreditMemos(user.userId),
-          storage.getAllInvoiceLineItems(),
-          storage.getAllCreditMemoLineItems(),
+        const userId = user.userId;
+
+        // Fetch products and user-scoped line items (joined with invoices/credit_memos)
+        // in parallel using direct SQL joins — avoids fetching ALL users' line items
+        const [products, invoiceLineRows, creditMemoLineRows] = await Promise.all([
+          storage.getProducts(userId),
+          db.execute(sql`
+            SELECT il.product_id, il.quantity, i.invoice_type
+            FROM invoice_line_items il
+            JOIN invoices i ON il.invoice_id = i.id
+            WHERE i.user_id = ${userId}
+              AND il.product_id IS NOT NULL
+              AND il.quantity > 0
+          `),
+          db.execute(sql`
+            SELECT cl.product_id, cl.quantity, c.invoice_type
+            FROM credit_memo_line_items cl
+            JOIN credit_memos c ON cl.credit_memo_id = c.id
+            WHERE c.user_id = ${userId}
+              AND cl.product_id IS NOT NULL
+              AND cl.quantity > 0
+          `),
         ]);
 
-        // Create lookup maps for invoices and credit memos
-        const invoiceMap = new Map(invoices.map((inv: any) => [inv.id, inv]));
-        const creditMemoMap = new Map(creditMemos.map((cm: any) => [cm.id, cm]));
+        // Build per-product quantity map from invoice movements
+        const qtyMap = new Map<string, number>();
 
-        // Build all line items with invoice/credit memo data
-        const allLineItems: any[] = [];
-        
-        // Process invoice line items
-        for (const item of allInvoiceLineItems) {
-          const invoice = invoiceMap.get(item.invoiceId);
-          if (invoice) {
-            allLineItems.push({
-              ...item,
-              invoiceType: invoice.invoiceType,
-              isCreditMemo: false,
-            });
-          }
+        for (const row of invoiceLineRows.rows as any[]) {
+          const current = qtyMap.get(row.product_id) ?? 0;
+          // AP Invoice = purchase → adds stock; AR Invoice = sale → removes stock
+          const delta = row.invoice_type === "payable" ? Number(row.quantity) : -Number(row.quantity);
+          qtyMap.set(row.product_id, current + delta);
         }
 
-        // Process credit memo line items
-        for (const item of allCreditMemoLineItems) {
-          const creditMemo = creditMemoMap.get(item.creditMemoId);
-          if (creditMemo) {
-            allLineItems.push({
-              ...item,
-              invoiceType: creditMemo.invoiceType,
-              isCreditMemo: true,
-            });
-          }
+        for (const row of creditMemoLineRows.rows as any[]) {
+          const current = qtyMap.get(row.product_id) ?? 0;
+          // AR Credit Memo = return from customer → adds stock; AP Credit Memo = return to supplier → removes
+          const delta = row.invoice_type === "receivable" ? Number(row.quantity) : -Number(row.quantity);
+          qtyMap.set(row.product_id, current + delta);
         }
 
-        // Calculate correct quantity for each product based on movements
+        // Update products whose quantity differs from calculated net
         const syncResults: any[] = [];
         for (const product of products) {
-          const productLineItems = allLineItems.filter(
-            (item: any) => item.productId === product.id && item.quantity > 0,
-          );
-
-          // Calculate net quantity based on invoices and credit memos
-          let netQuantity = 0;
-          for (const item of productLineItems) {
-            if (item.isCreditMemo) {
-              // Credit memos have opposite effect of invoices:
-              // AR Credit Memo: Adds to inventory (returning goods from customer)
-              // AP Credit Memo: Subtracts from inventory (returning goods to supplier)
-              if (item.invoiceType === "receivable") {
-                netQuantity += item.quantity;
-              } else if (item.invoiceType === "payable") {
-                netQuantity -= item.quantity;
-              }
-            } else {
-              // Invoices:
-              // AP Invoice: Adds to inventory (purchases)
-              // AR Invoice: Subtracts from inventory (sales)
-              if (item.invoiceType === "payable") {
-                netQuantity += item.quantity;
-              } else if (item.invoiceType === "receivable") {
-                netQuantity -= item.quantity;
-              }
-            }
-          }
-
-          // Update product quantity if different
+          const netQuantity = qtyMap.get(product.id) ?? 0;
           if (product.qty !== netQuantity) {
             await storage.updateProduct(product.id, { qty: netQuantity });
             syncResults.push({
