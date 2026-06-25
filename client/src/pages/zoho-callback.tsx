@@ -1,55 +1,33 @@
-import { useEffect } from "react";
-import { RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
 
 export default function ZohoCallback() {
+  const [status, setStatus] = useState<"processing" | "success" | "error">("processing");
+  const [errorMsg, setErrorMsg] = useState("");
+
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        let urlParams = new URLSearchParams(window.location.search);
-        let code = urlParams.get("code");
-        let state = urlParams.get("state");
+        // Parse code and state from query string
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get("code");
+        const state = urlParams.get("state");
 
         if (!code || !state) {
-          const hash = window.location.hash;
-          if (hash.includes("?")) {
-            const hashParams = hash.split("?")[1];
-            urlParams = new URLSearchParams(hashParams);
-            code = urlParams.get("code");
-            state = urlParams.get("state");
-          }
-        }
-
-        const sendResult = (type: string, message?: string) => {
-          const payload = { type, message };
-          if (window.opener && !window.opener.closed) {
-            try {
-              // Use '*' so message works across dev/published/Render domain boundaries
-              window.opener.postMessage(payload, "*");
-              setTimeout(() => window.close(), 500);
-              return;
-            } catch {
-              // opener blocked — fall through to redirect
-            }
-          }
-          const redirectPath = type === "zoho_auth_success"
-            ? "/auth/zoho#success=true"
-            : `/auth/zoho#error=${message || "auth_failed"}`;
-          window.location.replace(redirectPath);
-        };
-
-        if (!code || !state) {
-          sendResult("zoho_auth_error", "missing_params");
+          setStatus("error");
+          setErrorMsg("Missing authorization code. Please try connecting again.");
+          setTimeout(() => {
+            window.location.replace("/auth/zoho#error=missing_params");
+          }, 2000);
           return;
         }
 
         const token = localStorage.getItem("token");
         const headers: Record<string, string> = {
-          Accept: "application/json",
           "X-Requested-With": "XMLHttpRequest",
+          Accept: "application/json",
         };
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
+        if (token) headers["Authorization"] = `Bearer ${token}`;
 
         const response = await fetch(
           `/api/auth/zoho/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
@@ -57,30 +35,29 @@ export default function ZohoCallback() {
         );
 
         if (response.ok) {
-          sendResult("zoho_auth_success");
+          setStatus("success");
+          setTimeout(() => {
+            window.location.replace("/auth/zoho#success=true");
+          }, 1000);
         } else {
-          let errorMessage = "auth_failed";
+          let msg = `HTTP ${response.status}`;
           try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorData.error || errorMessage;
-          } catch {
-            errorMessage = `HTTP ${response.status}`;
-          }
-          sendResult("zoho_auth_error", errorMessage);
+            const body = await response.json();
+            msg = body.message || body.error || msg;
+          } catch { /* ignore */ }
+          setStatus("error");
+          setErrorMsg(msg);
+          setTimeout(() => {
+            window.location.replace(`/auth/zoho#error=${encodeURIComponent(msg)}`);
+          }, 2000);
         }
-      } catch (error: any) {
-        console.error("Zoho callback error:", error);
-        const sendResult = (type: string, message?: string) => {
-          if (window.opener && !window.opener.closed) {
-            try {
-              window.opener.postMessage({ type, message }, window.location.origin);
-              setTimeout(() => window.close(), 300);
-              return;
-            } catch { /* ignore */ }
-          }
-          window.location.replace(`/auth/zoho#error=${message || "auth_failed"}`);
-        };
-        sendResult("zoho_auth_error", error?.message || "auth_failed");
+      } catch (err: any) {
+        const msg = err?.message || "Network error";
+        setStatus("error");
+        setErrorMsg(msg);
+        setTimeout(() => {
+          window.location.replace(`/auth/zoho#error=${encodeURIComponent(msg)}`);
+        }, 2000);
       }
     };
 
@@ -88,11 +65,30 @@ export default function ZohoCallback() {
   }, []);
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <RefreshCw className="mx-auto h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-lg text-muted-foreground">Connecting to Zoho Books...</p>
-        <p className="mt-2 text-sm text-muted-foreground">This window will close automatically</p>
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="text-center p-8 max-w-sm">
+        {status === "processing" && (
+          <>
+            <RefreshCw className="mx-auto h-12 w-12 animate-spin text-primary mb-4" />
+            <p className="text-lg font-medium">Connecting to Zoho Books...</p>
+            <p className="mt-2 text-sm text-muted-foreground">Please wait while we complete authorization.</p>
+          </>
+        )}
+        {status === "success" && (
+          <>
+            <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
+            <p className="text-lg font-medium">Connected!</p>
+            <p className="mt-2 text-sm text-muted-foreground">Redirecting you back...</p>
+          </>
+        )}
+        {status === "error" && (
+          <>
+            <AlertCircle className="mx-auto h-12 w-12 text-destructive mb-4" />
+            <p className="text-lg font-medium">Connection Failed</p>
+            <p className="mt-2 text-sm text-muted-foreground">{errorMsg}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Redirecting you back...</p>
+          </>
+        )}
       </div>
     </div>
   );
