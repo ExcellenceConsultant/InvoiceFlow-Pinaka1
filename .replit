@@ -47,3 +47,7 @@ expertMode = true
 [userenv.shared]
 ZOHO_ACCOUNTS_URL = "https://accounts.zoho.com"
 ZOHO_API_BASE_URL = "https://www.zohoapis.com/books/v3"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
