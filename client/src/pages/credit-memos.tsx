@@ -45,6 +45,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Cloud,
   X,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
@@ -406,6 +407,38 @@ export default function CreditMemos() {
     },
   });
 
+  const postToZohoMutation = useMutation({
+    mutationFn: async (creditMemoId: string) => {
+      const response = await apiRequest(
+        "POST",
+        `/api/credit-memos/${creditMemoId}/post-to-zoho`,
+        {},
+      );
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw errorData;
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/credit-memos"] });
+      toast({
+        title: "Credit Memo Posted to Zoho Books",
+        description: data.message || "Credit memo posted successfully",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Zoho credit memo post error:", error);
+      const errorData = error.response?.data || error;
+      toast({
+        title: "Failed to Post Credit Memo",
+        description:
+          errorData.message || "Failed to post credit memo to Zoho Books",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteCreditMemoMutation = useMutation({
     mutationFn: async (creditMemoId: string) => {
       const response = await apiRequest(
@@ -476,6 +509,15 @@ export default function CreditMemos() {
     }
     console.log("Posting credit memo to QuickBooks:", creditMemoId);
     postToQuickBooksMutation.mutate(creditMemoId);
+  };
+
+  const handlePostToZoho = (creditMemoId: string, event?: React.MouseEvent) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    console.log("Posting credit memo to Zoho Books:", creditMemoId);
+    postToZohoMutation.mutate(creditMemoId);
   };
 
   const getCustomerName = (customerId: string) => {
@@ -1473,6 +1515,30 @@ export default function CreditMemos() {
                               >
                                 <FileDown size={14} />
                               </Button>
+                              {!invoice.zohoCreditNoteId && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-orange-600 hover:text-orange-600 dark:text-orange-400 dark:hover:text-orange-400"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handlePostToZoho(invoice.id, e);
+                                  }}
+                                  disabled={
+                                    postToZohoMutation.isPending ||
+                                    !permissions.canPostToQuickBooks
+                                  }
+                                  data-testid={`button-post-to-zoho-${invoice.id}`}
+                                  title="Post credit memo to Zoho Books"
+                                >
+                                  <Cloud size={14} />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
