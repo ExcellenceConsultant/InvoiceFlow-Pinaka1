@@ -357,6 +357,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const tokens = await zohoBooksService.exchangeCodeForTokens(code as string);
 
+      if (!tokens.refreshToken) {
+        console.error("Zoho Books: NO refresh_token returned. User must revoke app access in Zoho and reconnect.");
+        if (isApiCall) return res.status(400).json({ error: "no_refresh_token", message: "Zoho did not return a refresh token. Please go to Zoho Accounts > Connected Apps, revoke this app, then reconnect." });
+        const msg = encodeURIComponent("Zoho did not return a refresh token. Please revoke this app in Zoho Accounts > Connected Apps, then reconnect.");
+        return res.redirect(`${origin}/#/auth/zoho#error=no_refresh_token&message=${msg}`);
+      }
+
       // Fetch organizations so user can select one (or auto-select if only one)
       const organizations = await zohoBooksService.getOrganizations(tokens.accessToken);
 
@@ -377,7 +384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         organizations,
       });
 
-      console.log("Zoho Books connected:", { organizationId: org.organization_id, name: org.name });
+      console.log("Zoho Books connected successfully:", { organizationId: org.organization_id, name: org.name, hasRefreshToken: !!tokens.refreshToken });
 
       if (isApiCall) return res.json({ connected: true, organizationId: org.organization_id, organizationName: org.name });
       return res.redirect(`${origin}/#/auth/zoho#success=true`);

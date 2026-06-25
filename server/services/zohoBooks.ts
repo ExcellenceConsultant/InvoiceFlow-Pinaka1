@@ -128,6 +128,7 @@ export class ZohoBooksService {
       scope: "ZohoBooks.fullaccess.all",
       redirect_uri: redirectUri || this.redirectUri,
       access_type: "offline",
+      prompt: "consent",   // forces Zoho to always return a refresh_token
       state,
     });
     return `${this.accountsUrl}/oauth/v2/auth?${params.toString()}`;
