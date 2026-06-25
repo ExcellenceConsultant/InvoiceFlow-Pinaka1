@@ -314,17 +314,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Zoho Books OAuth routes
   // ============================================================
 
+  // Diagnostic: safe info for debugging OAuth setup (no secrets)
+  app.get("/api/auth/zoho/debug", isAuthenticated, async (req, res) => {
+    const clientIdSet = !!process.env.ZOHO_CLIENT_ID;
+    const clientSecretSet = !!process.env.ZOHO_CLIENT_SECRET;
+    const redirectUri = process.env.ZOHO_REDIRECT_URI || "(not set)";
+    const accountsUrl = process.env.ZOHO_ACCOUNTS_URL || "https://accounts.zoho.com";
+    res.json({ clientIdSet, clientSecretSet, redirectUri, accountsUrl });
+  });
+
   app.get("/api/auth/zoho", isAuthenticated, async (req, res) => {
     try {
       const user = (req as any).user;
-      const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol;
-      const host = (req.headers["x-forwarded-host"] as string) || req.get("host");
-      const dynamicRedirectUri = `${proto}://${host}/zoho-callback`;
-      const authUrl = zohoBooksService.getAuthorizationUrl(user.userId, dynamicRedirectUri);
+      // Use the static env var redirect URI — reliable across all proxy setups.
+      // Both Replit published and Render share the same DB, so connecting once works everywhere.
+      const authUrl = zohoBooksService.getAuthorizationUrl(user.userId);
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.json({ authUrl });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to generate Zoho auth URL" });
+    } catch (error: any) {
+      console.error("Zoho auth URL error:", error.message);
+      res.status(500).json({ message: error.message || "Failed to generate Zoho auth URL" });
     }
   });
 
@@ -332,15 +341,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { code, state } = req.query;
 
-      // Derive the redirect URI from the actual request host (must match what was used in auth)
-      const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol;
-      const host = (req.headers["x-forwarded-host"] as string) || req.get("host");
-      const dynamicRedirectUri = `${proto}://${host}/zoho-callback`;
-
       const origin =
         req.headers.origin ||
         req.headers.referer?.split("/").slice(0, 3).join("/") ||
-        `${proto}://${host}`;
+        `${req.protocol}://${req.get("host")}`;
 
       const isApiCall =
         req.headers.accept?.includes("application/json") ||
@@ -351,7 +355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect(`${origin}/#/auth/zoho#error=missing_params`);
       }
 
-      const tokens = await zohoBooksService.exchangeCodeForTokens(code as string, dynamicRedirectUri);
+      const tokens = await zohoBooksService.exchangeCodeForTokens(code as string);
 
       // Fetch organizations so user can select one (or auto-select if only one)
       const organizations = await zohoBooksService.getOrganizations(tokens.accessToken);

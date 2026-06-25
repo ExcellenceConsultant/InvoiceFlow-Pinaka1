@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link as LinkIcon, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Building2 } from "lucide-react";
+import { Link as LinkIcon, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Building2, ShieldCheck, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -19,30 +19,38 @@ export default function ZohoAuth() {
     staleTime: 30000,
   });
 
+  const { data: debugInfo } = useQuery<{
+    clientIdSet: boolean;
+    clientSecretSet: boolean;
+    redirectUri: string;
+    accountsUrl: string;
+  }>({
+    queryKey: ["/api/auth/zoho/debug"],
+    staleTime: 60000,
+  });
+
   const disconnectMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest("POST", "/api/auth/zoho/disconnect");
-    },
+    mutationFn: async () => apiRequest("POST", "/api/auth/zoho/disconnect"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/zoho/status"] });
-      toast({ title: "Success", description: "Zoho Books account disconnected successfully" });
+      toast({ title: "Disconnected", description: "Zoho Books account disconnected." });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to disconnect Zoho Books account", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to disconnect.", variant: "destructive" });
     },
   });
 
   const selectOrgMutation = useMutation({
     mutationFn: async (organizationId: string) => {
-      const response = await apiRequest("POST", "/api/auth/zoho/select-organization", { organizationId });
-      return await response.json();
+      const r = await apiRequest("POST", "/api/auth/zoho/select-organization", { organizationId });
+      return r.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/zoho/status"] });
-      toast({ title: "Success", description: "Organization selected successfully" });
+      toast({ title: "Success", description: "Organization selected." });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to select organization", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to select organization.", variant: "destructive" });
     },
   });
 
@@ -51,41 +59,20 @@ export default function ZohoAuth() {
     setAuthError(null);
     try {
       const resp = await apiRequest("GET", "/api/auth/zoho");
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.message || `Server error ${resp.status}`);
-      }
       const data = await resp.json();
-      if (!data.authUrl) throw new Error("No auth URL returned from server");
-
-      // Standard full-page navigation — works on all devices including mobile.
-      // Tries window.top first to escape any iframe (Replit preview pane),
-      // falls back to current window if cross-origin top is blocked.
-      try {
-        if (window.top && window.top !== window) {
-          window.top.location.href = data.authUrl;
-        } else {
-          window.location.href = data.authUrl;
-        }
-      } catch {
-        window.location.href = data.authUrl;
-      }
+      if (!data.authUrl) throw new Error("Server did not return an auth URL");
+      // Full-page navigation — works on desktop and mobile alike.
+      window.location.href = data.authUrl;
     } catch (err: any) {
-      console.error("Zoho auth error:", err);
+      console.error("Zoho connect error:", err);
       const msg = err?.message || "Unknown error";
       setAuthError(msg);
       setIsConnecting(false);
-      toast({ title: "Error", description: msg, variant: "destructive" });
+      toast({ title: "Connection Error", description: msg, variant: "destructive" });
     }
   };
 
-  const handleDisconnect = () => {
-    if (confirm("Are you sure you want to disconnect your Zoho Books account?")) {
-      disconnectMutation.mutate();
-    }
-  };
-
-  // Read success/error from URL hash after Zoho redirects back
+  // Read result from URL hash after Zoho redirects back
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes("success=true")) {
@@ -93,11 +80,11 @@ export default function ZohoAuth() {
       toast({ title: "Connected!", description: "Zoho Books connected successfully." });
       window.history.replaceState(null, "", window.location.pathname);
     } else if (hash.includes("error=")) {
-      const match = hash.match(/error=([^&]*)/);
       const msgMatch = hash.match(/message=([^&]*)/);
+      const errMatch = hash.match(/error=([^&]*)/);
       const msg = msgMatch
         ? decodeURIComponent(msgMatch[1])
-        : match ? decodeURIComponent(match[1]) : "Authentication failed";
+        : errMatch ? decodeURIComponent(errMatch[1]) : "Authentication failed";
       setAuthError(msg);
       window.history.replaceState(null, "", window.location.pathname);
     }
@@ -108,12 +95,13 @@ export default function ZohoAuth() {
   const isTokenExpired = tokenExpiry ? tokenExpiry < new Date() : false;
   const organizations = zohoStatus?.organizations || [];
 
+  const configOk = debugInfo?.clientIdSet && debugInfo?.clientSecretSet &&
+    debugInfo?.redirectUri && debugInfo.redirectUri !== "(not set)";
+
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-        </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -125,7 +113,61 @@ export default function ZohoAuth() {
         <p className="text-muted-foreground mt-1">Connect your Zoho Books account to sync invoices, customers, and inventory</p>
       </div>
 
-      <Card className="mb-8">
+      {/* ── Diagnostic panel ──────────────────────────────── */}
+      {debugInfo && (
+        <Card className={`mb-6 border-2 ${configOk ? "border-green-200" : "border-red-200"}`}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck size={18} className={configOk ? "text-green-500" : "text-red-500"} />
+              Server Configuration
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                {debugInfo.clientIdSet
+                  ? <CheckCircle size={15} className="text-green-500" />
+                  : <XCircle size={15} className="text-red-500" />}
+                <span>ZOHO_CLIENT_ID: {debugInfo.clientIdSet ? "✓ set" : "✗ NOT SET — add to Replit Secrets"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {debugInfo.clientSecretSet
+                  ? <CheckCircle size={15} className="text-green-500" />
+                  : <XCircle size={15} className="text-red-500" />}
+                <span>ZOHO_CLIENT_SECRET: {debugInfo.clientSecretSet ? "✓ set" : "✗ NOT SET — add to Replit Secrets"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {debugInfo.redirectUri !== "(not set)"
+                  ? <CheckCircle size={15} className="text-green-500" />
+                  : <XCircle size={15} className="text-red-500" />}
+                <span className="break-all">
+                  ZOHO_REDIRECT_URI: <code className="bg-muted px-1 rounded">{debugInfo.redirectUri}</code>
+                </span>
+              </div>
+            </div>
+            {!configOk && (
+              <Alert className="mt-3" variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  One or more required environment variables are missing. The Connect button will not work until they are set.
+                </AlertDescription>
+              </Alert>
+            )}
+            {configOk && debugInfo.redirectUri !== "(not set)" && (
+              <Alert className="mt-3">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Make sure <code className="bg-muted px-1 rounded">{debugInfo.redirectUri}</code> is registered as a Redirect URI in your{" "}
+                  <a href="https://api-console.zoho.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Zoho API Console</a>.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Connection status card ─────────────────────── */}
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center">
             <LinkIcon className="mr-2 text-primary" size={20} />
@@ -148,23 +190,26 @@ export default function ZohoAuth() {
                 {isConnected && tokenExpiry && (
                   <p className="text-xs text-muted-foreground">
                     Token expires: {tokenExpiry.toLocaleDateString()}
-                    {isTokenExpired && <span className="text-destructive ml-1">(Expired)</span>}
+                    {isTokenExpired && <span className="text-destructive ml-1">(Expired — reconnect)</span>}
                   </p>
                 )}
               </div>
             </div>
-
             <div className="flex items-center space-x-3">
-              <Badge className={isConnected && !isTokenExpired ? "bg-accent text-accent-foreground" : "bg-destructive text-destructive-foreground"}>
+              <Badge className={isConnected && !isTokenExpired
+                ? "bg-accent text-accent-foreground"
+                : "bg-destructive text-destructive-foreground"}>
                 {isConnected && !isTokenExpired ? "Connected" : "Disconnected"}
               </Badge>
               {isConnected ? (
-                <Button variant="outline" onClick={handleDisconnect} disabled={disconnectMutation.isPending}>
+                <Button variant="outline" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending}>
                   {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect"}
                 </Button>
               ) : (
-                <Button onClick={handleConnect} disabled={isConnecting} data-testid="button-connect">
-                  {isConnecting ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Connecting...</> : "Connect"}
+                <Button onClick={handleConnect} disabled={isConnecting || !configOk} data-testid="button-connect">
+                  {isConnecting
+                    ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Redirecting to Zoho...</>
+                    : "Connect"}
                 </Button>
               )}
             </div>
@@ -176,11 +221,21 @@ export default function ZohoAuth() {
               <AlertDescription>{authError}</AlertDescription>
             </Alert>
           )}
+
+          {isConnecting && (
+            <Alert className="mt-4">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <AlertDescription>
+                Redirecting you to Zoho for authorization. Complete sign-in there, then you'll be brought back automatically.
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 
+      {/* ── Org selection ──────────────────────────────── */}
       {isConnected && organizations.length > 1 && (
-        <Card className="mb-8">
+        <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center">
               <Building2 className="mr-2 text-primary" size={20} />
@@ -188,9 +243,7 @@ export default function ZohoAuth() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Currently using: <strong>{zohoStatus.organizationName}</strong>
-            </p>
+            <p className="text-sm text-muted-foreground mb-4">Currently using: <strong>{zohoStatus.organizationName}</strong></p>
             <div className="space-y-2">
               {organizations.map((org: any) => (
                 <div key={org.organization_id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -198,13 +251,9 @@ export default function ZohoAuth() {
                     <p className="font-medium">{org.name}</p>
                     <p className="text-xs text-muted-foreground">{org.organization_id}</p>
                   </div>
-                  {org.organization_id === zohoStatus.organizationId ? (
-                    <Badge className="bg-accent text-accent-foreground">Active</Badge>
-                  ) : (
-                    <Button size="sm" variant="outline" onClick={() => selectOrgMutation.mutate(org.organization_id)} disabled={selectOrgMutation.isPending}>
-                      Select
-                    </Button>
-                  )}
+                  {org.organization_id === zohoStatus.organizationId
+                    ? <Badge className="bg-accent text-accent-foreground">Active</Badge>
+                    : <Button size="sm" variant="outline" onClick={() => selectOrgMutation.mutate(org.organization_id)} disabled={selectOrgMutation.isPending}>Select</Button>}
                 </div>
               ))}
             </div>
@@ -212,73 +261,61 @@ export default function ZohoAuth() {
         </Card>
       )}
 
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Setup Checklist</CardTitle>
-        </CardHeader>
+      {/* ── Setup checklist ────────────────────────────── */}
+      <Card className="mb-6">
+        <CardHeader><CardTitle>Setup Steps</CardTitle></CardHeader>
         <CardContent>
-          <Alert className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Register both Redirect URIs</strong> in your{" "}
-              <a href="https://api-console.zoho.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Zoho API Console</a>:
-              <ul className="mt-2 space-y-1 text-xs font-mono">
-                <li className="p-1 bg-muted rounded">https://invoice-flow-2--njipjoshi.replit.app/zoho-callback</li>
-                <li className="p-1 bg-muted rounded">https://invoiceflow-pinaka1.onrender.com/zoho-callback</li>
-              </ul>
-            </AlertDescription>
-          </Alert>
-          <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground ml-1">
-            <li>Go to <a href="https://api-console.zoho.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">api-console.zoho.com</a> → open your app → <strong>Edit</strong> → add both URIs above</li>
-            <li>Ensure <code>ZOHO_CLIENT_ID</code> and <code>ZOHO_CLIENT_SECRET</code> are set in Replit Secrets (and in Render environment variables)</li>
-            <li>Click <strong>Connect</strong> above — you'll be taken to Zoho to sign in, then redirected back automatically</li>
+          <ol className="space-y-3 text-sm">
+            <li className="flex gap-3">
+              <span className="shrink-0 font-bold text-primary">1.</span>
+              <span>Go to <a href="https://api-console.zoho.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">api-console.zoho.com</a> → open your Server-based app → <strong>Edit</strong> → add this Redirect URI:
+                <code className="block mt-1 p-2 bg-muted rounded font-mono text-xs break-all">
+                  {debugInfo?.redirectUri && debugInfo.redirectUri !== "(not set)"
+                    ? debugInfo.redirectUri
+                    : "https://invoice-flow-2--njipjoshi.replit.app/zoho-callback"}
+                </code>
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 font-bold text-primary">2.</span>
+              <span>Confirm <strong>ZOHO_CLIENT_ID</strong> and <strong>ZOHO_CLIENT_SECRET</strong> are set in Replit Secrets (see panel above).</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 font-bold text-primary">3.</span>
+              <span>Click <strong>Connect</strong> above — you'll be taken to Zoho to sign in, then redirected back automatically.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 font-bold text-primary">4.</span>
+              <span>Once connected, the Zoho Sync page will work on <strong>both</strong> the Replit and Render sites (they share the same database).</span>
+            </li>
           </ol>
         </CardContent>
       </Card>
 
-      <Card className="mb-8">
-        <CardHeader><CardTitle>Why Connect Zoho Books?</CardTitle></CardHeader>
+      {/* ── Benefits ────────────────────────────────────── */}
+      <Card>
+        <CardHeader><CardTitle>What syncs to Zoho Books?</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              ["Invoice Sync", "Post AR invoices and AP bills directly to Zoho Books"],
-              ["Customer & Vendor Sync", "Keep contacts synchronized between both platforms"],
-              ["Item / Inventory Sync", "Products synced by SKU to prevent duplicates"],
-              ["Credit Note Sync", "AR credit memos and AP vendor credits both supported"],
-            ].map(([title, desc]) => (
-              <div key={title} className="flex items-start space-x-3">
-                <CheckCircle className="text-accent mt-1 shrink-0" size={18} />
+              ["Invoices & Bills", "Post AR invoices and AP bills directly"],
+              ["Customers & Vendors", "Contacts stay in sync by name"],
+              ["Products / Inventory", "Items matched by SKU to prevent duplicates"],
+              ["Credit Notes", "AR credit memos and AP vendor credits"],
+            ].map(([t, d]) => (
+              <div key={t} className="flex items-start gap-3">
+                <CheckCircle className="text-accent mt-0.5 shrink-0" size={17} />
                 <div>
-                  <h4 className="font-medium text-foreground text-sm">{title}</h4>
-                  <p className="text-xs text-muted-foreground">{desc}</p>
+                  <p className="font-medium text-sm">{t}</p>
+                  <p className="text-xs text-muted-foreground">{d}</p>
                 </div>
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle>Security &amp; Privacy</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[
-              "OAuth 2.0 — industry standard for secure API access",
-              "Your Zoho credentials are never stored on our servers",
-              "Access tokens are automatically refreshed before expiry",
-              "Disconnect at any time to revoke access immediately",
-            ].map((text) => (
-              <div key={text} className="flex items-start space-x-3">
-                <CheckCircle className="text-accent mt-0.5 shrink-0" size={15} />
-                <p className="text-sm text-foreground">{text}</p>
-              </div>
-            ))}
-          </div>
           <div className="mt-4 p-3 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground">
-              <ExternalLink className="inline mr-1" size={13} />
-              <a href="https://www.zoho.com/books/api/v3/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Zoho Books API documentation</a>
-            </p>
+            <a href="https://www.zoho.com/books/api/v3/" target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+              <ExternalLink size={13} /> Zoho Books API documentation
+            </a>
           </div>
         </CardContent>
       </Card>
