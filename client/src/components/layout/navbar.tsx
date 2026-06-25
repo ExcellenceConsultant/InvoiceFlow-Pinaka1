@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Bell, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import pinakaLogo from "@/assets/pinaka-logo.jpg";
 
 export default function Navbar() {
@@ -9,6 +10,12 @@ export default function Navbar() {
   const { user, logout } = useAuth();
 
   const isQuickBooksConnected = !!user?.quickbooksCompanyId;
+
+  const { data: zohoStatus } = useQuery<any>({
+    queryKey: ["/api/auth/zoho/status"],
+    staleTime: 60_000,
+  });
+  const isZohoConnected = !!zohoStatus?.connected;
 
   return (
     <nav
@@ -115,6 +122,15 @@ export default function Navbar() {
                   QB Sync
                 </Button>
               </Link>
+              <Link href="/auth/zoho">
+                <Button
+                  variant={location === "/auth/zoho" ? "default" : "ghost"}
+                  size="sm"
+                  data-testid="link-zoho-settings"
+                >
+                  Zoho
+                </Button>
+              </Link>
               <Link href="/zoho/sync">
                 <Button
                   variant={location === "/zoho/sync" ? "default" : "ghost"}
@@ -158,6 +174,28 @@ export default function Navbar() {
                 {isQuickBooksConnected ? "QB" : "QB Off"}
               </span>
             </div>
+
+            {/* Zoho Books Connection Status */}
+            <Link href="/auth/zoho">
+              <div
+                className={`hidden sm:flex items-center space-x-1.5 px-2 py-1 rounded-md cursor-pointer ${
+                  isZohoConnected
+                    ? "bg-accent/10 text-accent-foreground"
+                    : "bg-destructive/10 text-destructive-foreground"
+                }`}
+                data-testid="zoho-status"
+                title={isZohoConnected ? `Zoho Books connected — ${zohoStatus?.organizationName || ""}` : "Zoho Books not connected — click to connect"}
+              >
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    isZohoConnected ? "bg-accent animate-pulse" : "bg-destructive"
+                  }`}
+                />
+                <span className="text-xs font-medium whitespace-nowrap">
+                  {isZohoConnected ? "ZB" : "ZB Off"}
+                </span>
+              </div>
+            </Link>
 
             <Button
               variant="ghost"
