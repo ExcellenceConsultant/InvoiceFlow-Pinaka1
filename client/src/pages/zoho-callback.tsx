@@ -23,11 +23,12 @@ export default function ZohoCallback() {
           const payload = { type, message };
           if (window.opener && !window.opener.closed) {
             try {
-              window.opener.postMessage(payload, window.location.origin);
-              setTimeout(() => window.close(), 300);
+              // Use '*' so message works across dev/published/Render domain boundaries
+              window.opener.postMessage(payload, "*");
+              setTimeout(() => window.close(), 500);
               return;
             } catch {
-              // opener is cross-origin or blocked — fall through to redirect
+              // opener blocked — fall through to redirect
             }
           }
           const redirectPath = type === "zoho_auth_success"

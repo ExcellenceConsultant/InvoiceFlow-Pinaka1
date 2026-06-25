@@ -14,41 +14,19 @@ export default function ZohoAuth() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const popupRef = useRef<Window | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: zohoStatus, isLoading } = useQuery<any>({
     queryKey: ["/api/auth/zoho/status"],
     staleTime: 30000,
   });
 
-  const initializeAuthMutation = useMutation({
+  const fetchAuthUrlMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("GET", "/api/auth/zoho");
       const data = await response.json();
       if (!data.authUrl) throw new Error("No auth URL returned from server");
-      return data;
-    },
-    onSuccess: (data: any) => {
-      const authUrl = data.authUrl;
-      const popup = window.open(authUrl, "zoho_oauth", "width=600,height=700,scrollbars=yes,resizable=yes");
-      if (!popup || popup.closed) {
-        window.location.href = authUrl;
-        return;
-      }
-      popupRef.current = popup;
-      const timer = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(timer);
-          setIsConnecting(false);
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/zoho/status"] });
-        }
-      }, 500);
-    },
-    onError: (error: any) => {
-      console.error("Zoho auth init error:", error);
-      const msg = error?.message || "Unknown error";
-      setAuthError(`Failed to initialize Zoho Books authentication: ${msg}`);
-      setIsConnecting(false);
-      toast({ title: "Error", description: `Failed to start Zoho Books authentication: ${msg}`, variant: "destructive" });
+      return data as { authUrl: string };
     },
   });
 
@@ -79,10 +57,71 @@ export default function ZohoAuth() {
     },
   });
 
-  const handleConnect = () => {
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  const handleConnect = async () => {
     setIsConnecting(true);
     setAuthError(null);
-    initializeAuthMutation.mutate();
+    stopPolling();
+
+    // Step 1: Pre-open the popup IMMEDIATELY on click (before any async work)
+    // so the browser treats it as a direct user gesture.
+    const popup = window.open("about:blank", "zoho_oauth", "width=640,height=720,scrollbars=yes,resizable=yes,noopener=no");
+    popupRef.current = popup;
+
+    if (!popup || popup.closed) {
+      // Popup was blocked — fall back to same-window navigation
+      try {
+        const resp = await apiRequest("GET", "/api/auth/zoho");
+        const data = await resp.json();
+        window.location.href = data.authUrl;
+      } catch {
+        setAuthError("Could not open Zoho authorization. Please allow popups and try again.");
+        setIsConnecting(false);
+      }
+      return;
+    }
+
+    // Step 2: Show a loading message in the popup while we fetch the URL
+    try {
+      popup.document.write(
+        "<html><body style='font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5'>" +
+        "<p style='color:#555'>Connecting to Zoho Books, please wait...</p></body></html>"
+      );
+    } catch {
+      // cross-origin write blocked after navigation (safe to ignore)
+    }
+
+    // Step 3: Fetch the auth URL from our server
+    try {
+      const resp = await apiRequest("GET", "/api/auth/zoho");
+      const data = await resp.json();
+      if (!data.authUrl) throw new Error("No auth URL returned from server");
+
+      // Step 4: Navigate the pre-opened popup to Zoho
+      popup.location.href = data.authUrl;
+
+      // Step 5: Poll every 500ms — if user closes popup without completing, reset state
+      pollRef.current = setInterval(() => {
+        if (popup.closed) {
+          stopPolling();
+          setIsConnecting(false);
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/zoho/status"] });
+        }
+      }, 500);
+    } catch (err: any) {
+      console.error("Zoho auth init error:", err);
+      popup.close();
+      const msg = err?.message || "Unknown error";
+      setAuthError(`Failed to initialize Zoho Books authentication: ${msg}`);
+      setIsConnecting(false);
+      toast({ title: "Error", description: `Failed to start Zoho Books authentication: ${msg}`, variant: "destructive" });
+    }
   };
 
   const handleDisconnect = () => {
@@ -91,15 +130,18 @@ export default function ZohoAuth() {
     }
   };
 
+  // Listen for postMessage from the callback popup
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "zoho_auth_success") {
+        stopPolling();
         queryClient.invalidateQueries({ queryKey: ["/api/auth/zoho/status"] });
         toast({ title: "Success", description: "Zoho Books connected successfully!" });
         setIsConnecting(false);
         setAuthError(null);
         if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
       } else if (event.data?.type === "zoho_auth_error") {
+        stopPolling();
         const msg = event.data.message || "Zoho Books authentication failed";
         setAuthError(msg);
         setIsConnecting(false);
@@ -108,8 +150,26 @@ export default function ZohoAuth() {
       }
     };
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      stopPolling();
+    };
   }, [queryClient, toast]);
+
+  // Handle hash-based success/error from same-window redirect fallback
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes("success=true")) {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/zoho/status"] });
+      toast({ title: "Success", description: "Zoho Books connected successfully!" });
+      window.history.replaceState(null, "", window.location.pathname);
+    } else if (hash.includes("error=")) {
+      const match = hash.match(/error=([^&]*)/);
+      const msg = match ? decodeURIComponent(match[1]) : "Authentication failed";
+      setAuthError(msg);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   const isConnected = zohoStatus?.connected;
   const tokenExpiry = zohoStatus?.tokenExpiry ? new Date(zohoStatus.tokenExpiry) : null;
@@ -187,10 +247,10 @@ export default function ZohoAuth() {
               ) : (
                 <Button
                   onClick={handleConnect}
-                  disabled={isConnecting || initializeAuthMutation.isPending}
+                  disabled={isConnecting}
                   data-testid="button-connect"
                 >
-                  {isConnecting || initializeAuthMutation.isPending ? "Connecting..." : "Connect"}
+                  {isConnecting ? "Connecting..." : "Connect"}
                 </Button>
               )}
             </div>
@@ -200,7 +260,8 @@ export default function ZohoAuth() {
             <Alert className="mt-4" data-testid="connecting-alert">
               <RefreshCw className="h-4 w-4 animate-spin" />
               <AlertDescription>
-                A Zoho authorization window has opened. Please complete sign-in there, then return here.
+                A Zoho authorization window is open. Complete sign-in there, then return here.
+                If you don't see it, check if your browser blocked a popup.
               </AlertDescription>
             </Alert>
           )}
@@ -285,23 +346,23 @@ export default function ZohoAuth() {
           <Alert className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Important:</strong> The Redirect URI registered in your Zoho API Console must be:
-              <code className="block mt-2 p-2 bg-muted rounded text-sm font-mono">
-                {window.location.origin}/zoho-callback
-              </code>
-              <span className="block mt-1 text-xs text-muted-foreground">
-                Also register the deployed app URL: <code>https://invoice-flow-2--njipjoshi.replit.app/zoho-callback</code>
-              </span>
+              <strong>Important:</strong> Register <strong>both</strong> of these Redirect URIs in your{" "}
+              <a href="https://api-console.zoho.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                Zoho API Console
+              </a>:
+              <ul className="mt-2 space-y-1">
+                <li><code className="p-1 bg-muted rounded text-sm font-mono">https://invoice-flow-2--njipjoshi.replit.app/zoho-callback</code></li>
+                <li><code className="p-1 bg-muted rounded text-sm font-mono">https://invoiceflow-pinaka1.onrender.com/zoho-callback</code></li>
+              </ul>
             </AlertDescription>
           </Alert>
           <div className="space-y-2 text-sm">
             <p className="text-muted-foreground">To set up your Zoho Books app:</p>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground ml-2">
               <li>Go to <a href="https://api-console.zoho.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Zoho API Console</a></li>
-              <li>Create a new <strong>Server-based Application</strong></li>
-              <li>Add both redirect URIs shown above</li>
-              <li>Copy Client ID and Secret → set <code>ZOHO_CLIENT_ID</code>, <code>ZOHO_CLIENT_SECRET</code>, <code>ZOHO_REDIRECT_URI</code> in Replit Secrets</li>
-              <li>Set <code>ZOHO_REDIRECT_URI</code> to whichever URL you want Zoho to redirect back to after auth</li>
+              <li>Open your app → <strong>Edit</strong> → add both Redirect URIs above</li>
+              <li>Make sure <code>ZOHO_CLIENT_ID</code> and <code>ZOHO_CLIENT_SECRET</code> are set in Replit Secrets</li>
+              <li>Click <strong>Connect</strong> above to authorize</li>
             </ol>
           </div>
         </CardContent>
@@ -309,7 +370,7 @@ export default function ZohoAuth() {
 
       <Card data-testid="security-info-card">
         <CardHeader>
-          <CardTitle>Security & Privacy</CardTitle>
+          <CardTitle>Security &amp; Privacy</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
