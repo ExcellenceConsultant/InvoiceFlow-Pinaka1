@@ -317,7 +317,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/zoho", isAuthenticated, async (req, res) => {
     try {
       const user = (req as any).user;
-      const authUrl = zohoBooksService.getAuthorizationUrl(user.userId);
+      const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol;
+      const host = (req.headers["x-forwarded-host"] as string) || req.get("host");
+      const dynamicRedirectUri = `${proto}://${host}/zoho-callback`;
+      const authUrl = zohoBooksService.getAuthorizationUrl(user.userId, dynamicRedirectUri);
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.json({ authUrl });
     } catch (error) {
@@ -329,10 +332,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { code, state } = req.query;
 
+      // Derive the redirect URI from the actual request host (must match what was used in auth)
+      const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol;
+      const host = (req.headers["x-forwarded-host"] as string) || req.get("host");
+      const dynamicRedirectUri = `${proto}://${host}/zoho-callback`;
+
       const origin =
         req.headers.origin ||
         req.headers.referer?.split("/").slice(0, 3).join("/") ||
-        `${req.protocol}://${req.get("host")}`;
+        `${proto}://${host}`;
 
       const isApiCall =
         req.headers.accept?.includes("application/json") ||
@@ -343,7 +351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect(`${origin}/#/auth/zoho#error=missing_params`);
       }
 
-      const tokens = await zohoBooksService.exchangeCodeForTokens(code as string);
+      const tokens = await zohoBooksService.exchangeCodeForTokens(code as string, dynamicRedirectUri);
 
       // Fetch organizations so user can select one (or auto-select if only one)
       const organizations = await zohoBooksService.getOrganizations(tokens.accessToken);

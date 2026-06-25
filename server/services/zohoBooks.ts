@@ -121,19 +121,19 @@ export class ZohoBooksService {
 
   // ─── OAuth ────────────────────────────────────────────────────
 
-  getAuthorizationUrl(state: string): string {
+  getAuthorizationUrl(state: string, redirectUri?: string): string {
     const params = new URLSearchParams({
       response_type: "code",
       client_id: this.clientId,
       scope: "ZohoBooks.fullaccess.all",
-      redirect_uri: this.redirectUri,
+      redirect_uri: redirectUri || this.redirectUri,
       access_type: "offline",
       state,
     });
     return `${this.accountsUrl}/oauth/v2/auth?${params.toString()}`;
   }
 
-  async exchangeCodeForTokens(code: string): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+  async exchangeCodeForTokens(code: string, redirectUri?: string): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
     try {
       const response = await axios.post(
         `${this.accountsUrl}/oauth/v2/token`,
@@ -141,7 +141,7 @@ export class ZohoBooksService {
           grant_type: "authorization_code",
           client_id: this.clientId,
           client_secret: this.clientSecret,
-          redirect_uri: this.redirectUri,
+          redirect_uri: redirectUri || this.redirectUri,
           code,
         }),
         { headers: { "Content-Type": "application/x-www-form-urlencoded" } },
