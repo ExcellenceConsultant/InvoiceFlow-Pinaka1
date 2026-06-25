@@ -40,6 +40,7 @@ import { z } from "zod";
 import { isAuthenticated, requireRole } from "./auth";
 import { registerAuthRoutes } from "./authRoutes";
 import { quickBooksService } from "./services/quickbooks";
+import { zohoBooksService } from "./services/zohoBooks";
 import { storage } from "./storage";
 
 // Configure multer for file uploads (memory storage) with limits
@@ -308,6 +309,525 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
+
+  // ============================================================
+  // Zoho Books OAuth routes
+  // ============================================================
+
+  app.get("/api/auth/zoho", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const authUrl = zohoBooksService.getAuthorizationUrl(user.userId);
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.json({ authUrl });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to generate Zoho auth URL" });
+    }
+  });
+
+  app.get("/api/auth/zoho/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+
+      const origin =
+        req.headers.origin ||
+        req.headers.referer?.split("/").slice(0, 3).join("/") ||
+        `${req.protocol}://${req.get("host")}`;
+
+      const isApiCall =
+        req.headers.accept?.includes("application/json") ||
+        req.headers["x-requested-with"];
+
+      if (!code || !state) {
+        if (isApiCall) return res.status(400).json({ error: "missing_params" });
+        return res.redirect(`${origin}/#/auth/zoho#error=missing_params`);
+      }
+
+      const tokens = await zohoBooksService.exchangeCodeForTokens(code as string);
+
+      // Fetch organizations so user can select one (or auto-select if only one)
+      const organizations = await zohoBooksService.getOrganizations(tokens.accessToken);
+
+      if (organizations.length === 0) {
+        if (isApiCall) return res.status(400).json({ error: "no_organizations", message: "No Zoho Books organizations found" });
+        return res.redirect(`${origin}/#/auth/zoho#error=no_organizations`);
+      }
+
+      // Auto-select the first organization (or save all for user to choose)
+      const org = organizations[0];
+
+      await storage.setSystemSetting("zoho_books_config", {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        tokenExpiry: new Date(Date.now() + tokens.expiresIn * 1000),
+        organizationId: org.organization_id,
+        organizationName: org.name,
+        organizations,
+      });
+
+      console.log("Zoho Books connected:", { organizationId: org.organization_id, name: org.name });
+
+      if (isApiCall) return res.json({ connected: true, organizationId: org.organization_id, organizationName: org.name });
+      return res.redirect(`${origin}/#/auth/zoho#success=true`);
+    } catch (error: any) {
+      console.error("Zoho Books callback error:", error.message);
+      const origin =
+        req.headers.origin ||
+        req.headers.referer?.split("/").slice(0, 3).join("/") ||
+        `${req.protocol}://${req.get("host")}`;
+      const isApiCall =
+        req.headers.accept?.includes("application/json") ||
+        req.headers["x-requested-with"];
+      const encodedMessage = encodeURIComponent(error.message || "Authentication failed");
+      if (isApiCall) return res.status(500).json({ error: "auth_failed", message: error.message });
+      return res.redirect(`${origin}/#/auth/zoho#error=auth_failed&message=${encodedMessage}`);
+    }
+  });
+
+  app.post("/api/auth/zoho/disconnect", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteSystemSetting("zoho_books_config");
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Zoho disconnect error:", error);
+      res.status(500).json({ message: "Failed to disconnect Zoho Books" });
+    }
+  });
+
+  // Select Zoho organization (when multiple orgs exist)
+  app.post("/api/auth/zoho/select-organization", isAuthenticated, async (req, res) => {
+    try {
+      const { organizationId } = req.body;
+      const zohoConfig = await storage.getSystemSetting("zoho_books_config");
+      if (!zohoConfig) return res.status(400).json({ message: "Zoho Books not connected" });
+
+      const org = (zohoConfig.organizations || []).find((o: any) => o.organization_id === organizationId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+
+      await storage.setSystemSetting("zoho_books_config", {
+        ...zohoConfig,
+        organizationId: org.organization_id,
+        organizationName: org.name,
+      });
+
+      res.json({ success: true, organizationId: org.organization_id, organizationName: org.name });
+    } catch (error) {
+      console.error("Zoho select org error:", error);
+      res.status(500).json({ message: "Failed to select organization" });
+    }
+  });
+
+  // Get Zoho connection status
+  app.get("/api/auth/zoho/status", isAuthenticated, async (req, res) => {
+    try {
+      const zohoConfig = await storage.getSystemSetting("zoho_books_config");
+      if (!zohoConfig) return res.json({ connected: false });
+      res.json({
+        connected: true,
+        organizationId: zohoConfig.organizationId,
+        organizationName: zohoConfig.organizationName,
+        tokenExpiry: zohoConfig.tokenExpiry,
+        organizations: zohoConfig.organizations || [],
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch Zoho status" });
+    }
+  });
+
+  // Helper: ensure valid Zoho tokens, refresh if needed
+  async function ensureValidZohoTokens() {
+    const zohoConfig = await storage.getSystemSetting("zoho_books_config");
+    if (!zohoConfig || !zohoConfig.refreshToken) {
+      throw new Error("No Zoho Books refresh token. Please reconnect.");
+    }
+    const tokenExpiry = zohoConfig.tokenExpiry ? new Date(zohoConfig.tokenExpiry) : new Date(0);
+    const timeUntilExpiry = tokenExpiry.getTime() - Date.now();
+    if (timeUntilExpiry < 5 * 60 * 1000) {
+      console.log("Zoho Books token expired or expiring soon, refreshing...");
+      const refreshed = await zohoBooksService.refreshAccessToken(zohoConfig.refreshToken);
+      const updated = {
+        ...zohoConfig,
+        accessToken: refreshed.accessToken,
+        refreshToken: refreshed.refreshToken,
+        tokenExpiry: new Date(Date.now() + 3600 * 1000),
+      };
+      await storage.setSystemSetting("zoho_books_config", updated);
+      return updated;
+    }
+    return zohoConfig;
+  }
+
+  // ── Zoho Books: Sync customer ─────────────────────────────────
+  app.post("/api/customers/:id/sync-zoho", isAuthenticated, async (req, res) => {
+    try {
+      const customer = await storage.getCustomer(req.params.id);
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      const zohoConfig = await ensureValidZohoTokens();
+      if (!zohoConfig.organizationId) return res.status(400).json({ message: "Zoho Books not connected or organization not selected" });
+
+      // Try to find existing contact, or create
+      let zohoContact = await zohoBooksService.findContactByName(
+        zohoConfig.accessToken, zohoConfig.organizationId, customer.name, "customer"
+      );
+
+      if (!zohoContact) {
+        const addr = customer.address as any;
+        zohoContact = await zohoBooksService.createCustomer(zohoConfig.accessToken, zohoConfig.organizationId, {
+          contact_name: customer.name,
+          contact_type: "customer",
+          email: customer.email || undefined,
+          phone: customer.phone || undefined,
+          billing_address: addr ? { street: addr.street, city: addr.city, state: addr.state, zip: addr.zipCode, country: addr.country } : undefined,
+        });
+      } else {
+        zohoContact = await zohoBooksService.updateCustomer(zohoConfig.accessToken, zohoConfig.organizationId, zohoContact.contact_id, {
+          contact_name: customer.name,
+          email: customer.email || undefined,
+          phone: customer.phone || undefined,
+        });
+      }
+
+      await storage.updateCustomer(customer.id, { zohoBooksContactId: zohoContact.contact_id });
+
+      res.json({ success: true, zohoBooksContactId: zohoContact.contact_id, contactName: zohoContact.contact_name });
+    } catch (error: any) {
+      console.error("Zoho customer sync error:", error.message);
+      res.status(500).json({ message: error.message || "Failed to sync customer to Zoho Books" });
+    }
+  });
+
+  // ── Zoho Books: Sync vendor ───────────────────────────────────
+  app.post("/api/vendors/:id/sync-zoho", isAuthenticated, async (req, res) => {
+    try {
+      const vendor = await storage.getCustomer(req.params.id);
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      if (vendor.type !== "vendor") return res.status(400).json({ message: "This record is not a vendor" });
+
+      const zohoConfig = await ensureValidZohoTokens();
+      if (!zohoConfig.organizationId) return res.status(400).json({ message: "Zoho Books not connected or organization not selected" });
+
+      let zohoContact = await zohoBooksService.findContactByName(
+        zohoConfig.accessToken, zohoConfig.organizationId, vendor.name, "vendor"
+      );
+
+      if (!zohoContact) {
+        const addr = vendor.address as any;
+        zohoContact = await zohoBooksService.createVendor(zohoConfig.accessToken, zohoConfig.organizationId, {
+          contact_name: vendor.name,
+          contact_type: "vendor",
+          email: vendor.email || undefined,
+          phone: vendor.phone || undefined,
+          billing_address: addr ? { street: addr.street, city: addr.city, state: addr.state, zip: addr.zipCode, country: addr.country } : undefined,
+        });
+      } else {
+        zohoContact = await zohoBooksService.updateVendor(zohoConfig.accessToken, zohoConfig.organizationId, zohoContact.contact_id, {
+          contact_name: vendor.name,
+          email: vendor.email || undefined,
+          phone: vendor.phone || undefined,
+        });
+      }
+
+      await storage.updateCustomer(vendor.id, { zohoBooksContactId: zohoContact.contact_id });
+
+      res.json({ success: true, zohoBooksContactId: zohoContact.contact_id, contactName: zohoContact.contact_name });
+    } catch (error: any) {
+      console.error("Zoho vendor sync error:", error.message);
+      res.status(500).json({ message: error.message || "Failed to sync vendor to Zoho Books" });
+    }
+  });
+
+  // ── Zoho Books: Sync product/item ─────────────────────────────
+  app.post("/api/products/:id/sync-zoho", isAuthenticated, async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) return res.status(404).json({ message: "Product not found" });
+
+      const zohoConfig = await ensureValidZohoTokens();
+      if (!zohoConfig.organizationId) return res.status(400).json({ message: "Zoho Books not connected or organization not selected" });
+
+      let zohoItem: any;
+
+      // Try to find by SKU first if item code exists
+      if (product.itemCode) {
+        zohoItem = await zohoBooksService.findItemBySKU(zohoConfig.accessToken, zohoConfig.organizationId, product.itemCode);
+      }
+
+      if (!zohoItem && product.zohoBooksItemId) {
+        // Already linked — update it
+        zohoItem = await zohoBooksService.updateItem(zohoConfig.accessToken, zohoConfig.organizationId, product.zohoBooksItemId, {
+          name: product.name,
+          sku: product.itemCode || undefined,
+          description: product.description || undefined,
+          rate: product.salesPrice ? parseFloat(String(product.salesPrice)) : undefined,
+          purchase_rate: product.basePrice ? parseFloat(String(product.basePrice)) : undefined,
+        });
+      } else if (zohoItem) {
+        // Found by SKU — link and update
+        zohoItem = await zohoBooksService.updateItem(zohoConfig.accessToken, zohoConfig.organizationId, zohoItem.item_id, {
+          name: product.name,
+          description: product.description || undefined,
+          rate: product.salesPrice ? parseFloat(String(product.salesPrice)) : undefined,
+          purchase_rate: product.basePrice ? parseFloat(String(product.basePrice)) : undefined,
+        });
+      } else {
+        // Create new item
+        zohoItem = await zohoBooksService.createItem(zohoConfig.accessToken, zohoConfig.organizationId, {
+          name: product.name,
+          item_type: "sales_and_purchases",
+          sku: product.itemCode || undefined,
+          description: product.description || undefined,
+          rate: product.salesPrice ? parseFloat(String(product.salesPrice)) : 0,
+          purchase_rate: product.basePrice ? parseFloat(String(product.basePrice)) : 0,
+        });
+      }
+
+      await storage.updateProduct(product.id, { zohoBooksItemId: zohoItem.item_id });
+
+      res.json({ success: true, zohoBooksItemId: zohoItem.item_id, itemName: zohoItem.name });
+    } catch (error: any) {
+      console.error("Zoho product sync error:", error.message);
+      res.status(500).json({ message: error.message || "Failed to sync product to Zoho Books" });
+    }
+  });
+
+  // ── Zoho Books: Post invoice/bill ─────────────────────────────
+  app.post("/api/invoices/:id/post-to-zoho", isAuthenticated, async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+
+      const zohoConfig = await ensureValidZohoTokens();
+      if (!zohoConfig.organizationId) return res.status(400).json({ message: "Zoho Books not connected or organization not selected" });
+
+      const lineItems = await storage.getInvoiceLineItems(invoice.id);
+      const invoiceType = (invoice as any).invoiceType || "receivable";
+
+      // Sync all products first
+      const failedProducts: string[] = [];
+      for (const item of lineItems) {
+        if (!item.productId) continue;
+        const product = await storage.getProduct(item.productId);
+        if (!product || product.zohoBooksItemId) continue;
+        if (!product.itemCode) continue;
+        try {
+          let zohoItem = await zohoBooksService.findItemBySKU(zohoConfig.accessToken, zohoConfig.organizationId, product.itemCode);
+          if (!zohoItem) {
+            zohoItem = await zohoBooksService.createItem(zohoConfig.accessToken, zohoConfig.organizationId, {
+              name: product.name,
+              item_type: "sales_and_purchases",
+              sku: product.itemCode,
+              description: product.description || undefined,
+              rate: product.salesPrice ? parseFloat(String(product.salesPrice)) : 0,
+              purchase_rate: product.basePrice ? parseFloat(String(product.basePrice)) : 0,
+            });
+          }
+          await storage.updateProduct(product.id, { zohoBooksItemId: zohoItem.item_id });
+        } catch (itemError: any) {
+          console.error(`Failed to sync product ${product.name} to Zoho:`, itemError.message);
+          failedProducts.push(product.name);
+        }
+      }
+
+      if (failedProducts.length > 0) {
+        return res.status(500).json({
+          message: `Failed to sync ${failedProducts.length} product(s) to Zoho Books: ${failedProducts.join(", ")}`,
+          failedProducts,
+        });
+      }
+
+      if (invoiceType === "receivable") {
+        // AR Invoice → Zoho Invoice
+        const customer = await storage.getCustomer(invoice.customerId!);
+        if (!customer) return res.status(400).json({ message: "Customer not found" });
+
+        // Find or create customer in Zoho
+        let zohoContact = customer.zohoBooksContactId
+          ? { contact_id: customer.zohoBooksContactId }
+          : await zohoBooksService.findContactByName(zohoConfig.accessToken, zohoConfig.organizationId, customer.name, "customer");
+
+        if (!zohoContact) {
+          zohoContact = await zohoBooksService.createCustomer(zohoConfig.accessToken, zohoConfig.organizationId, {
+            contact_name: customer.name,
+            contact_type: "customer",
+            email: customer.email || undefined,
+          });
+          await storage.updateCustomer(customer.id, { zohoBooksContactId: zohoContact.contact_id });
+        }
+
+        // Build Zoho line items
+        const zohoLineItems = [];
+        for (const item of lineItems) {
+          if (!item.productId) continue;
+          if (parseFloat(String(item.quantity)) <= 0) continue;
+          const product = await storage.getProduct(item.productId);
+          if (!product || !product.zohoBooksItemId) continue;
+          zohoLineItems.push({
+            item_id: product.zohoBooksItemId,
+            name: item.description,
+            quantity: parseFloat(String(item.quantity)),
+            rate: parseFloat(String(item.unitPrice)),
+          });
+        }
+
+        if (zohoLineItems.length === 0) {
+          return res.status(400).json({ message: "No valid line items to post. Ensure all products are synced to Zoho Books." });
+        }
+
+        const dateStr = new Date(invoice.invoiceDate).toISOString().split("T")[0];
+        const dueDateStr = invoice.dueDate ? new Date(invoice.dueDate).toISOString().split("T")[0] : undefined;
+
+        let zohoInvoice: any;
+        if ((invoice as any).zohoBooksInvoiceId) {
+          zohoInvoice = await zohoBooksService.updateInvoice(zohoConfig.accessToken, zohoConfig.organizationId, (invoice as any).zohoBooksInvoiceId, {
+            customer_id: zohoContact.contact_id,
+            date: dateStr,
+            due_date: dueDateStr,
+            line_items: zohoLineItems,
+            notes: invoice.notes || undefined,
+          });
+        } else {
+          zohoInvoice = await zohoBooksService.createInvoice(zohoConfig.accessToken, zohoConfig.organizationId, {
+            customer_id: zohoContact.contact_id,
+            invoice_number: invoice.invoiceNumber,
+            date: dateStr,
+            due_date: dueDateStr,
+            line_items: zohoLineItems,
+            notes: invoice.notes || undefined,
+            discount: parseFloat(String(invoice.discount)) || undefined,
+          });
+        }
+
+        await storage.updateInvoice(invoice.id, { zohoBooksInvoiceId: zohoInvoice.invoice_id } as any);
+
+        return res.json({ success: true, zohoBooksInvoiceId: zohoInvoice.invoice_id, invoiceNumber: zohoInvoice.invoice_number });
+      } else {
+        // AP Invoice → Zoho Bill
+        const vendor = await storage.getCustomer(invoice.customerId!);
+        if (!vendor) return res.status(400).json({ message: "Vendor not found" });
+
+        let zohoContact = vendor.zohoBooksContactId
+          ? { contact_id: vendor.zohoBooksContactId }
+          : await zohoBooksService.findContactByName(zohoConfig.accessToken, zohoConfig.organizationId, vendor.name, "vendor");
+
+        if (!zohoContact) {
+          zohoContact = await zohoBooksService.createVendor(zohoConfig.accessToken, zohoConfig.organizationId, {
+            contact_name: vendor.name,
+            contact_type: "vendor",
+            email: vendor.email || undefined,
+          });
+          await storage.updateCustomer(vendor.id, { zohoBooksContactId: zohoContact.contact_id });
+        }
+
+        const billLineItems = [];
+        for (const item of lineItems) {
+          if (!item.productId) continue;
+          if (parseFloat(String(item.quantity)) <= 0) continue;
+          const product = await storage.getProduct(item.productId);
+          if (!product || !product.zohoBooksItemId) continue;
+          billLineItems.push({
+            item_id: product.zohoBooksItemId,
+            name: item.description,
+            quantity: parseFloat(String(item.quantity)),
+            rate: parseFloat(String(item.unitPrice)),
+          });
+        }
+
+        if (billLineItems.length === 0) {
+          return res.status(400).json({ message: "No valid line items to post. Ensure all products are synced to Zoho Books." });
+        }
+
+        const dateStr = new Date(invoice.invoiceDate).toISOString().split("T")[0];
+        const dueDateStr = invoice.dueDate ? new Date(invoice.dueDate).toISOString().split("T")[0] : undefined;
+
+        const zohoBill = await zohoBooksService.createBill(zohoConfig.accessToken, zohoConfig.organizationId, {
+          vendor_id: zohoContact.contact_id,
+          bill_number: invoice.invoiceNumber,
+          date: dateStr,
+          due_date: dueDateStr,
+          line_items: billLineItems,
+          notes: invoice.notes || undefined,
+        });
+
+        await storage.updateInvoice(invoice.id, { zohoBooksInvoiceId: zohoBill.bill_id } as any);
+
+        return res.json({ success: true, zohoBooksInvoiceId: zohoBill.bill_id, billNumber: zohoBill.bill_number });
+      }
+    } catch (error: any) {
+      console.error("Zoho post invoice error:", error.message);
+      res.status(500).json({ message: error.message || "Failed to post to Zoho Books" });
+    }
+  });
+
+  // ── Zoho Books: Post credit memo ──────────────────────────────
+  app.post("/api/credit-memos/:id/post-to-zoho", isAuthenticated, async (req, res) => {
+    try {
+      const creditMemo = await storage.getCreditMemo(req.params.id);
+      if (!creditMemo) return res.status(404).json({ message: "Credit memo not found" });
+
+      const zohoConfig = await ensureValidZohoTokens();
+      if (!zohoConfig.organizationId) return res.status(400).json({ message: "Zoho Books not connected or organization not selected" });
+
+      const lineItems = await storage.getCreditMemoLineItems(creditMemo.id);
+      const memoType = (creditMemo as any).invoiceType || "receivable";
+
+      const contact = await storage.getCustomer((creditMemo as any).customerId!);
+      if (!contact) return res.status(400).json({ message: "Customer/vendor not found" });
+
+      const contactType = memoType === "receivable" ? "customer" : "vendor";
+      let zohoContact = (creditMemo as any).zohoBooksContactId
+        ? { contact_id: (creditMemo as any).zohoBooksContactId }
+        : await zohoBooksService.findContactByName(zohoConfig.accessToken, zohoConfig.organizationId, contact.name, contactType);
+
+      if (!zohoContact) {
+        if (contactType === "customer") {
+          zohoContact = await zohoBooksService.createCustomer(zohoConfig.accessToken, zohoConfig.organizationId, { contact_name: contact.name, contact_type: "customer" });
+        } else {
+          zohoContact = await zohoBooksService.createVendor(zohoConfig.accessToken, zohoConfig.organizationId, { contact_name: contact.name, contact_type: "vendor" });
+        }
+        await storage.updateCustomer(contact.id, { zohoBooksContactId: zohoContact.contact_id });
+      }
+
+      const zohoLineItems = [];
+      for (const item of lineItems) {
+        if (!item.productId || parseFloat(String(item.quantity)) <= 0) continue;
+        const product = await storage.getProduct(item.productId);
+        if (!product || !product.zohoBooksItemId) continue;
+        zohoLineItems.push({ item_id: product.zohoBooksItemId, name: item.description, quantity: parseFloat(String(item.quantity)), rate: parseFloat(String(item.unitPrice)) });
+      }
+
+      if (zohoLineItems.length === 0) {
+        return res.status(400).json({ message: "No valid line items. Ensure all products are synced to Zoho Books." });
+      }
+
+      const dateStr = new Date((creditMemo as any).creditMemoDate).toISOString().split("T")[0];
+
+      if (memoType === "receivable") {
+        const creditNote = await zohoBooksService.createCreditNote(zohoConfig.accessToken, zohoConfig.organizationId, {
+          customer_id: zohoContact.contact_id,
+          creditnote_number: (creditMemo as any).creditMemoNumber,
+          date: dateStr,
+          line_items: zohoLineItems,
+          notes: (creditMemo as any).notes || undefined,
+        });
+        await storage.updateCreditMemo((creditMemo as any).id, { zohoCreditNoteId: creditNote.creditnote_id } as any);
+        return res.json({ success: true, zohoCreditNoteId: creditNote.creditnote_id });
+      } else {
+        const vendorCredit = await zohoBooksService.createVendorCredit(zohoConfig.accessToken, zohoConfig.organizationId, {
+          vendor_id: zohoContact.contact_id,
+          vendor_credit_number: (creditMemo as any).creditMemoNumber,
+          date: dateStr,
+          line_items: zohoLineItems,
+          notes: (creditMemo as any).notes || undefined,
+        });
+        await storage.updateCreditMemo((creditMemo as any).id, { zohoCreditNoteId: vendorCredit.vendor_credit_id } as any);
+        return res.json({ success: true, zohoCreditNoteId: vendorCredit.vendor_credit_id });
+      }
+    } catch (error: any) {
+      console.error("Zoho post credit memo error:", error.message);
+      res.status(500).json({ message: error.message || "Failed to post credit memo to Zoho Books" });
+    }
+  });
 
   // Customer routes
   app.get("/api/customers", isAuthenticated, async (req, res) => {

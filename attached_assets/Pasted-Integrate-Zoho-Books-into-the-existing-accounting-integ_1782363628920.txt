@@ -1,0 +1,163 @@
+Integrate Zoho Books into the existing accounting integration without changing or breaking the current QuickBooks Online integration.
+
+IMPORTANT:
+- Do NOT modify or remove any existing QuickBooks functionality.
+- Do NOT change any existing UI, database structure, or business logic unless required for Zoho Books integration.
+- Reuse the existing integration architecture wherever possible.
+- Follow the same coding standards, folder structure, and naming conventions already used in the project.
+
+Implement the following:
+
+1. OAuth 2.0 Authentication
+- Add Zoho Books OAuth 2.0 authentication.
+- Allow users to connect their Zoho Books account.
+- Securely store Access Token, Refresh Token, Token Expiry, and Organization ID.
+- Automatically refresh expired access tokens.
+
+2. Organization Selection
+- After successful login, fetch all Zoho Organizations.
+- If multiple organizations exist, allow the user to select one.
+- Save the selected Organization ID for future API requests.
+
+3. Connected Apps
+- Add Zoho Books as another Accounting Software option alongside QuickBooks.
+- Users should be able to connect either or both accounting platforms independently.
+
+4. Customer Sync
+Support:
+- Create Customer
+- Update Customer
+- Prevent duplicate creation by storing Zoho Contact ID
+- Sync Name, Company Name, Email, Phone, Billing Address, Shipping Address, GSTIN (if applicable)
+
+5. Vendor Sync
+Support:
+- Create Vendor
+- Update Vendor
+- Store Zoho Vendor Contact ID
+
+6. Item / Inventory Sync
+Support:
+- Create Item
+- Update Item
+- Sync:
+  - Item Name
+  - SKU
+  - Description
+  - Sales Price
+  - Purchase Price
+  - Unit
+  - Tax
+  - Opening Stock (if applicable)
+- Store Zoho Item ID
+
+7. Invoice Sync
+Support:
+- Create Invoice
+- Update Invoice
+- Sync:
+  - Customer
+  - Invoice Number
+  - Invoice Date
+  - Due Date
+  - Line Items
+  - Quantity
+  - Rate
+  - Tax
+  - Discount
+  - Notes
+- Store Zoho Invoice ID
+
+8. Credit Memo Sync
+Map the existing Credit Memo module to Zoho Credit Notes.
+
+Support:
+- Create Credit Note
+- Update Credit Note
+
+9. Vendor Credit Sync
+Support:
+- Create Vendor Credit
+- Update Vendor Credit
+
+10. Tax Mapping
+Automatically fetch available Zoho Tax Rates.
+Map internal tax codes with Zoho tax IDs.
+
+11. Sync Mapping
+Maintain mapping between internal IDs and Zoho IDs to avoid duplicate records.
+
+12. Error Handling
+Display meaningful sync errors.
+Log API request and response errors.
+Retry temporary failures when appropriate.
+
+13. Sync Status
+Show:
+- Synced
+- Pending
+- Failed
+- Last Sync Time
+
+14. Background Sync
+Run sync operations asynchronously so the UI remains responsive.
+
+15. API Service Layer
+Create a dedicated ZohoBooksService similar to the existing QuickBooks service.
+
+Suggested structure:
+
+services/
+    quickbooks/
+    zohoBooks/
+
+The Zoho service should expose methods like:
+
+connect()
+refreshToken()
+getOrganizations()
+createCustomer()
+updateCustomer()
+createVendor()
+updateVendor()
+createItem()
+updateItem()
+createInvoice()
+updateInvoice()
+createCreditNote()
+updateCreditNote()
+createVendorCredit()
+updateVendorCredit()
+
+16. Configuration
+Add all required environment variables:
+
+ZOHO_CLIENT_ID
+ZOHO_CLIENT_SECRET
+ZOHO_REDIRECT_URI
+ZOHO_ACCOUNTS_URL
+ZOHO_API_BASE_URL
+
+17. Security
+Never expose client secrets.
+Store tokens securely.
+Use refresh tokens for authentication.
+Validate OAuth state parameter.
+
+18. Code Quality
+- Write clean, modular, production-ready code.
+- Follow existing project architecture.
+- Add comments where necessary.
+- Do not duplicate logic already implemented for QuickBooks.
+- Reuse common sync utilities whenever possible.
+
+19. Final Verification
+Ensure the following modules work correctly with Zoho Books:
+✓ Customer
+✓ Vendor
+✓ Inventory
+✓ Invoice
+✓ Credit Memo
+✓ Vendor Credit
+
+Most importantly, verify that the existing QuickBooks Online integration continues to function exactly as before without any regressions.

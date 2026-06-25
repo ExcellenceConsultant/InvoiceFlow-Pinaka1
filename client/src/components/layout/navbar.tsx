@@ -115,6 +115,15 @@ export default function Navbar() {
                   QB Sync
                 </Button>
               </Link>
+              <Link href="/zoho/sync">
+                <Button
+                  variant={location === "/zoho/sync" ? "default" : "ghost"}
+                  size="sm"
+                  data-testid="link-zoho-sync"
+                >
+                  Zoho Sync
+                </Button>
+              </Link>
               <Link href="/users">
                 <Button
                   variant={location === "/users" ? "default" : "ghost"}

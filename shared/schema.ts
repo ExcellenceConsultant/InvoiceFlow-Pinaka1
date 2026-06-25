@@ -61,6 +61,7 @@ export const customers = pgTable("customers", {
   defaultMarginPercent: decimal("default_margin_percent", { precision: 5, scale: 2 }), // Customer default margin for pricing
   customerCategory: text("customer_category"),
   quickbooksCustomerId: text("quickbooks_customer_id"),
+  zohoBooksContactId: text("zoho_books_contact_id"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -87,6 +88,7 @@ export const products = pgTable("products", {
   marginUpdatedBy: varchar("margin_updated_by"), // User who last updated margin
   marginUpdatedAt: timestamp("margin_updated_at"), // When margin was last updated
   quickbooksItemId: text("quickbooks_item_id"),
+  zohoBooksItemId: text("zoho_books_item_id"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -242,6 +244,7 @@ export const invoices = pgTable("invoices", {
   notes: text("notes"),
   bankDetails: text("bank_details"),
   quickbooksInvoiceId: text("quickbooks_invoice_id"),
+  zohoBooksInvoiceId: text("zoho_books_invoice_id"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -292,6 +295,7 @@ export const creditMemos = pgTable("credit_memos", {
   creditMemoDate: timestamp("credit_memo_date").notNull(),
   notes: text("notes"),
   quickbooksCreditMemoId: text("quickbooks_credit_memo_id"),
+  zohoCreditNoteId: text("zoho_credit_note_id"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

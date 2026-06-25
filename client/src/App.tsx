@@ -21,6 +21,9 @@ import Accounts from "@/pages/accounts";
 import QuickBooksAuth from "@/pages/quickbooks-auth";
 import QuickBooksCallback from "@/pages/quickbooks-callback";
 import QuickBooksSync from "@/pages/quickbooks-sync";
+import ZohoAuth from "@/pages/zoho-auth";
+import ZohoCallback from "@/pages/zoho-callback";
+import ZohoSync from "@/pages/zoho-sync";
 import UserManagement from "@/pages/user-management";
 import PriceRules from "@/pages/price-rules";
 import SalesTax from "@/pages/sales-tax";
@@ -115,6 +118,15 @@ function Router() {
         </Route>
         <Route path="/quickbooks/sync">
           <ProtectedRoute component={QuickBooksSync} />
+        </Route>
+        <Route path="/auth/zoho">
+          <ProtectedRoute component={ZohoAuth} />
+        </Route>
+        <Route path="/zoho-callback">
+          <ProtectedRoute component={ZohoCallback} />
+        </Route>
+        <Route path="/zoho/sync">
+          <ProtectedRoute component={ZohoSync} />
         </Route>
         <Route path="/users">
           <ProtectedRoute component={UserManagement} />
