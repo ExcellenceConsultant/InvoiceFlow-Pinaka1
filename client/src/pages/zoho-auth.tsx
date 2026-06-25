@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link as LinkIcon, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function ZohoAuth() {
@@ -14,24 +13,42 @@ export default function ZohoAuth() {
   const [authError, setAuthError] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
+  const popupRef = useRef<Window | null>(null);
 
   const { data: zohoStatus, isLoading } = useQuery<any>({
     queryKey: ["/api/auth/zoho/status"],
+    staleTime: 30000,
   });
 
   const initializeAuthMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("GET", "/api/auth/zoho");
-      return await response.json();
+      const data = await response.json();
+      if (!data.authUrl) throw new Error("No auth URL returned from server");
+      return data;
     },
     onSuccess: (data: any) => {
-      window.location.href = data.authUrl;
+      const authUrl = data.authUrl;
+      const popup = window.open(authUrl, "zoho_oauth", "width=600,height=700,scrollbars=yes,resizable=yes");
+      if (!popup || popup.closed) {
+        window.location.href = authUrl;
+        return;
+      }
+      popupRef.current = popup;
+      const timer = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(timer);
+          setIsConnecting(false);
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/zoho/status"] });
+        }
+      }, 500);
     },
-    onError: () => {
-      setAuthError("Failed to initialize Zoho Books authentication");
+    onError: (error: any) => {
+      console.error("Zoho auth init error:", error);
+      const msg = error?.message || "Unknown error";
+      setAuthError(`Failed to initialize Zoho Books authentication: ${msg}`);
       setIsConnecting(false);
-      toast({ title: "Error", description: "Failed to start Zoho Books authentication", variant: "destructive" });
+      toast({ title: "Error", description: `Failed to start Zoho Books authentication: ${msg}`, variant: "destructive" });
     },
   });
 
@@ -74,34 +91,24 @@ export default function ZohoAuth() {
     }
   };
 
-  // Handle OAuth callback result from hash params
   useEffect(() => {
-    const hash = window.location.hash;
-    const lastHashIndex = hash.lastIndexOf("#");
-    if (lastHashIndex > 0) {
-      const params = hash.substring(lastHashIndex + 1);
-      const urlParams = new URLSearchParams(params);
-      const success = urlParams.get("success");
-      const error = urlParams.get("error");
-      const message = urlParams.get("message");
-
-      if (success === "true") {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "zoho_auth_success") {
         queryClient.invalidateQueries({ queryKey: ["/api/auth/zoho/status"] });
         toast({ title: "Success", description: "Zoho Books connected successfully!" });
         setIsConnecting(false);
-        window.location.hash = "/auth/zoho";
-        return;
-      }
-
-      if (error) {
-        const errorMessage = message ? decodeURIComponent(message) : "Zoho Books authentication failed";
-        setAuthError(errorMessage);
+        setAuthError(null);
+        if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
+      } else if (event.data?.type === "zoho_auth_error") {
+        const msg = event.data.message || "Zoho Books authentication failed";
+        setAuthError(msg);
         setIsConnecting(false);
-        toast({ title: "Connection Failed", description: errorMessage, variant: "destructive" });
-        window.location.hash = "/auth/zoho";
-        return;
+        toast({ title: "Connection Failed", description: msg, variant: "destructive" });
+        if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
       }
-    }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, [queryClient, toast]);
 
   const isConnected = zohoStatus?.connected;
@@ -129,7 +136,6 @@ export default function ZohoAuth() {
         <p className="text-muted-foreground mt-1">Connect your Zoho Books account to sync invoices, customers, and inventory</p>
       </div>
 
-      {/* Connection Status */}
       <Card className="mb-8" data-testid="connection-status-card">
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -148,9 +154,7 @@ export default function ZohoAuth() {
                   {isConnected ? `Zoho Books — ${zohoStatus.organizationName}` : "Zoho Books"}
                 </h3>
                 <p className="text-sm text-muted-foreground" data-testid="connection-status-description">
-                  {isConnected
-                    ? `Organization ID: ${zohoStatus.organizationId}`
-                    : "Not connected"}
+                  {isConnected ? `Organization ID: ${zohoStatus.organizationId}` : "Not connected"}
                 </p>
                 {isConnected && tokenExpiry && (
                   <p className="text-xs text-muted-foreground" data-testid="token-expiry">
@@ -192,6 +196,15 @@ export default function ZohoAuth() {
             </div>
           </div>
 
+          {isConnecting && (
+            <Alert className="mt-4" data-testid="connecting-alert">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <AlertDescription>
+                A Zoho authorization window has opened. Please complete sign-in there, then return here.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {authError && (
             <Alert className="mt-4" variant="destructive" data-testid="auth-error-alert">
               <AlertCircle className="h-4 w-4" />
@@ -201,7 +214,6 @@ export default function ZohoAuth() {
         </CardContent>
       </Card>
 
-      {/* Organization Selection (when multiple orgs) */}
       {isConnected && organizations.length > 1 && (
         <Card className="mb-8" data-testid="org-selection-card">
           <CardHeader>
@@ -241,7 +253,6 @@ export default function ZohoAuth() {
         </Card>
       )}
 
-      {/* Integration Benefits */}
       <Card className="mb-8" data-testid="integration-benefits-card">
         <CardHeader>
           <CardTitle>Why Connect Zoho Books?</CardTitle>
@@ -266,7 +277,6 @@ export default function ZohoAuth() {
         </CardContent>
       </Card>
 
-      {/* Configuration Guide */}
       <Card className="mb-8" data-testid="configuration-guide-card">
         <CardHeader>
           <CardTitle>Configuration Requirements</CardTitle>
@@ -275,26 +285,28 @@ export default function ZohoAuth() {
           <Alert className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Important:</strong> The Redirect URI in your Zoho API Console must match exactly:
-              <code className="block mt-2 p-2 bg-muted rounded text-sm">
+              <strong>Important:</strong> The Redirect URI registered in your Zoho API Console must be:
+              <code className="block mt-2 p-2 bg-muted rounded text-sm font-mono">
                 {window.location.origin}/zoho-callback
               </code>
+              <span className="block mt-1 text-xs text-muted-foreground">
+                Also register the deployed app URL: <code>https://invoice-flow-2--njipjoshi.replit.app/zoho-callback</code>
+              </span>
             </AlertDescription>
           </Alert>
           <div className="space-y-2 text-sm">
             <p className="text-muted-foreground">To set up your Zoho Books app:</p>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground ml-2">
               <li>Go to <a href="https://api-console.zoho.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Zoho API Console</a></li>
-              <li>Create a new Server-based application</li>
-              <li>Add the Redirect URI shown above</li>
-              <li>Copy the Client ID and Client Secret into environment variables: <code>ZOHO_CLIENT_ID</code>, <code>ZOHO_CLIENT_SECRET</code>, <code>ZOHO_REDIRECT_URI</code></li>
-              <li>Save and connect</li>
+              <li>Create a new <strong>Server-based Application</strong></li>
+              <li>Add both redirect URIs shown above</li>
+              <li>Copy Client ID and Secret → set <code>ZOHO_CLIENT_ID</code>, <code>ZOHO_CLIENT_SECRET</code>, <code>ZOHO_REDIRECT_URI</code> in Replit Secrets</li>
+              <li>Set <code>ZOHO_REDIRECT_URI</code> to whichever URL you want Zoho to redirect back to after auth</li>
             </ol>
           </div>
         </CardContent>
       </Card>
 
-      {/* Security */}
       <Card data-testid="security-info-card">
         <CardHeader>
           <CardTitle>Security & Privacy</CardTitle>

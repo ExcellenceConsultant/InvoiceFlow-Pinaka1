@@ -1,19 +1,10 @@
 import { useEffect } from "react";
-import { useLocation } from "wouter";
 import { RefreshCw } from "lucide-react";
 
 export default function ZohoCallback() {
-  const [, setLocation] = useLocation();
-
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        console.log("=== Zoho Books Callback Debug ===");
-        console.log("Full URL:", window.location.href);
-        console.log("URL search:", window.location.search);
-        console.log("URL hash:", window.location.hash);
-
-        // Try search params first, then hash params
         let urlParams = new URLSearchParams(window.location.search);
         let code = urlParams.get("code");
         let state = urlParams.get("state");
@@ -28,10 +19,25 @@ export default function ZohoCallback() {
           }
         }
 
-        console.log("Zoho callback params found:", { code: !!code, state: !!state });
+        const sendResult = (type: string, message?: string) => {
+          const payload = { type, message };
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.postMessage(payload, window.location.origin);
+              setTimeout(() => window.close(), 300);
+              return;
+            } catch {
+              // opener is cross-origin or blocked — fall through to redirect
+            }
+          }
+          const redirectPath = type === "zoho_auth_success"
+            ? "/auth/zoho#success=true"
+            : `/auth/zoho#error=${message || "auth_failed"}`;
+          window.location.replace(redirectPath);
+        };
 
         if (!code || !state) {
-          setLocation("/auth/zoho#error=missing_params");
+          sendResult("zoho_auth_error", "missing_params");
           return;
         }
 
@@ -49,38 +55,43 @@ export default function ZohoCallback() {
           { headers, credentials: "include" },
         );
 
-        console.log("Zoho callback response:", response.status);
-
         if (response.ok) {
-          setLocation("/auth/zoho#success=true");
+          sendResult("zoho_auth_success");
         } else {
-          let errorType = "auth_failed";
-          let errorMessage = "Unknown error";
+          let errorMessage = "auth_failed";
           try {
             const errorData = await response.json();
-            errorType = errorData.error || errorType;
-            errorMessage = errorData.message || errorMessage;
+            errorMessage = errorData.message || errorData.error || errorMessage;
           } catch {
-            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            errorMessage = `HTTP ${response.status}`;
           }
-          console.error("Zoho callback error:", { errorType, errorMessage });
-          const encodedMessage = encodeURIComponent(errorMessage);
-          setLocation(`/auth/zoho#error=${errorType}&message=${encodedMessage}`);
+          sendResult("zoho_auth_error", errorMessage);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Zoho callback error:", error);
-        setLocation("/auth/zoho#error=auth_failed");
+        const sendResult = (type: string, message?: string) => {
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.postMessage({ type, message }, window.location.origin);
+              setTimeout(() => window.close(), 300);
+              return;
+            } catch { /* ignore */ }
+          }
+          window.location.replace(`/auth/zoho#error=${message || "auth_failed"}`);
+        };
+        sendResult("zoho_auth_error", error?.message || "auth_failed");
       }
     };
 
     handleCallback();
-  }, [setLocation]);
+  }, []);
 
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="text-center">
         <RefreshCw className="mx-auto h-12 w-12 animate-spin text-primary" />
         <p className="mt-4 text-lg text-muted-foreground">Connecting to Zoho Books...</p>
+        <p className="mt-2 text-sm text-muted-foreground">This window will close automatically</p>
       </div>
     </div>
   );

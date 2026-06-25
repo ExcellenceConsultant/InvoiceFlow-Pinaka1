@@ -47,6 +47,7 @@ expertMode = true
 [userenv.shared]
 ZOHO_ACCOUNTS_URL = "https://accounts.zoho.com"
 ZOHO_API_BASE_URL = "https://www.zohoapis.com/books/v3"
+ZOHO_REDIRECT_URI = "https://714772f3-d697-4893-b557-7f4ec41c3405-00-3uu9omxdcdfm8.worf.replit.dev/zoho-callback"
 
 [postMerge]
 path = "scripts/post-merge.sh"
