@@ -11,7 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/utils";
 import { Invoice, User } from "@shared/schema";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DollarSign, History, Link as LinkIcon, Plus } from "lucide-react";
+import { Building2, CheckCircle, DollarSign, History, Link as LinkIcon, Plus, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -79,49 +79,23 @@ export default function Dashboard() {
     return sorted.slice(0, 3);
   }, [allInvoices]);
 
-  const isQuickBooksConnected = !!user?.quickbooksCompanyId;
-
-  const disconnectMutation = useMutation({
-    mutationFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-
-      await apiRequest("PATCH", `/api/users/${user.id}`, {
-        quickbooksAccessToken: null,
-        quickbooksRefreshToken: null,
-        quickbooksCompanyId: null,
-        quickbooksCompanyName: null,
-        quickbooksTokenExpiry: null,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({
-        title: "Success",
-        description: "QuickBooks account disconnected successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to disconnect QuickBooks account",
-        variant: "destructive",
-      });
-    },
+  const { data: zohoStatus } = useQuery<any>({
+    queryKey: ["/api/auth/zoho/status"],
+    staleTime: 30000,
   });
 
-  const handleConnectQuickBooks = () => {
-    setLocation("/auth/quickbooks");
-  };
+  const isZohoConnected = zohoStatus?.connected === true;
 
-  const handleDisconnectQuickBooks = () => {
-    if (
-      confirm(
-        "Are you sure you want to disconnect your QuickBooks account? This will stop all synchronization.",
-      )
-    ) {
-      disconnectMutation.mutate();
-    }
-  };
+  const zohoDisconnectMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/auth/zoho/disconnect"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/zoho/status"] });
+      toast({ title: "Disconnected", description: "Zoho Books account disconnected." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to disconnect Zoho Books.", variant: "destructive" });
+    },
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -144,53 +118,49 @@ export default function Dashboard() {
       <StatsCards />
 
       <div className="space-y-8">
-        {/* QuickBooks Status */}
-        <Card data-testid="quickbooks-integration-card">
+        {/* Zoho Books Integration Status */}
+        <Card data-testid="zoho-integration-card">
           <CardHeader>
             <CardTitle className="flex items-center">
               <LinkIcon className="mr-2 text-primary" size={18} />
-              QuickBooks Integration
+              Zoho Books Integration
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">QB</span>
+                <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center shrink-0">
+                  <span className="text-white text-xs font-bold">ZB</span>
                 </div>
                 <div>
-                  <p
-                    className="font-medium text-foreground"
-                    data-testid="quickbooks-company-name"
-                  >
-                    {isQuickBooksConnected
-                      ? user?.quickbooksCompanyName || "Connected"
-                      : "Not Connected"}
+                  <p className="font-medium text-foreground" data-testid="zoho-org-name">
+                    {isZohoConnected ? zohoStatus?.organizationName || "Connected" : "Not Connected"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Company ID:{" "}
-                    <span data-testid="quickbooks-company-id">
-                      {user?.quickbooksCompanyId || "Not Available"}
-                    </span>
+                    {isZohoConnected
+                      ? `Org ID: ${zohoStatus?.organizationId}`
+                      : "Go to Zoho page to connect"}
                   </p>
                 </div>
               </div>
-              {isQuickBooksConnected ? (
+              {isZohoConnected ? (
                 <Button
                   variant="outline"
                   size="sm"
                   className="text-destructive border-destructive hover:bg-destructive/10"
-                  data-testid="button-disconnect-quickbooks"
-                  onClick={handleDisconnectQuickBooks}
-                  disabled={!permissions.canManageDashboard}
+                  data-testid="button-disconnect-zoho"
+                  onClick={() => {
+                    if (confirm("Disconnect Zoho Books? Sync will stop.")) zohoDisconnectMutation.mutate();
+                  }}
+                  disabled={zohoDisconnectMutation.isPending || !permissions.canManageDashboard}
                 >
                   Disconnect
                 </Button>
               ) : (
                 <Button
                   size="sm"
-                  data-testid="button-connect-quickbooks"
-                  onClick={handleConnectQuickBooks}
+                  data-testid="button-connect-zoho"
+                  onClick={() => setLocation("/auth/zoho")}
                   disabled={!permissions.canManageDashboard}
                 >
                   Connect
@@ -198,14 +168,25 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="text-center p-3 bg-primary/5 rounded-lg">
-              <p
-                className="text-2xl font-bold text-primary"
-                data-testid="quickbooks-connection-status"
-              >
-                {isQuickBooksConnected ? "Connected" : "Not Connected"}
-              </p>
-              <p className="text-sm text-muted-foreground">Connection Status</p>
+            <div className={`text-center p-3 rounded-lg ${isZohoConnected ? "bg-green-50 dark:bg-green-950/20" : "bg-muted"}`}>
+              <div className="flex items-center justify-center gap-2">
+                {isZohoConnected
+                  ? <CheckCircle className="text-green-600" size={22} />
+                  : <XCircle className="text-muted-foreground" size={22} />}
+                <p
+                  className={`text-2xl font-bold ${isZohoConnected ? "text-green-600" : "text-muted-foreground"}`}
+                  data-testid="zoho-connection-status"
+                >
+                  {isZohoConnected ? "Connected" : "Not Connected"}
+                </p>
+              </div>
+              {isZohoConnected && (
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  <Building2 size={13} className="text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">{zohoStatus?.organizationName}</p>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">Connection Status</p>
             </div>
           </CardContent>
         </Card>
