@@ -571,7 +571,7 @@ export default function Business() {
       const invoiceDateFormatted = invoice.invoiceDate
         ? formatDateWithoutTimezone(invoice.invoiceDate)
         : "";
-      const quickbooksStatus = invoice.quickbooksInvoiceId
+      const zohoStatus = invoice.zohoBooksInvoiceId
         ? "invoice posted"
         : "not posted";
 
@@ -583,8 +583,8 @@ export default function Business() {
         invoiceDateFormatted,
         amountString,
         displayStatus,
-        quickbooksStatus,
-        invoice.quickbooksInvoiceId,
+        zohoStatus,
+        invoice.zohoBooksInvoiceId,
         invoice.subtotal,
         invoice.freight,
         invoice.discount,
@@ -629,7 +629,7 @@ export default function Business() {
         case "status":
           return getDisplayStatus(invoice) || "";
         case "postStatus":
-          return invoice.quickbooksInvoiceId ? 1 : 0;
+          return invoice.zohoBooksInvoiceId ? 1 : 0;
         default:
           return "";
       }
@@ -949,8 +949,8 @@ export default function Business() {
           Discount: parseFloat(invoice.discount || 0).toFixed(2),
           "Total Amount": parseFloat(invoice.totalAmount || 0).toFixed(2),
           Status: displayStatus,
-          "Invoice Post": invoice.quickbooksInvoiceId ? "Posted" : "Not Posted",
-          "QB Invoice ID": invoice.quickbooksInvoiceId || "",
+          "Invoice Post": invoice.zohoBooksInvoiceId ? "Posted" : "Not Posted",
+          "Zoho Invoice ID": invoice.zohoBooksInvoiceId || "",
         };
       });
 
@@ -1430,14 +1430,14 @@ export default function Business() {
                           <td className="py-3 px-4">
                             <Badge
                               className={
-                                invoice.quickbooksInvoiceId
+                                invoice.zohoBooksInvoiceId
                                   ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 border-green-300"
                                   : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-300"
                               }
-                              variant={invoice.quickbooksInvoiceId ? "default" : "outline"}
+                              variant={invoice.zohoBooksInvoiceId ? "default" : "outline"}
                               data-testid={`invoice-post-status-${invoice.id}`}
                             >
-                              {invoice.quickbooksInvoiceId
+                              {invoice.zohoBooksInvoiceId
                                 ? invoice.invoiceType === "payable"
                                   ? "Bill Posted"
                                   : "Invoice Posted"
