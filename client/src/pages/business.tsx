@@ -1501,32 +1501,6 @@ export default function Business() {
                                   <Check size={14} />
                                 </Button>
                               )}
-                              {!invoice.quickbooksInvoiceId && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-blue-600 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-400"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                    }}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handlePostToQuickBooks(invoice.id, e);
-                                    }}
-                                    disabled={
-                                      postToQuickBooksMutation.isPending ||
-                                      !permissions.canPostToQuickBooks
-                                    }
-                                    data-testid={`button-post-to-quickbooks-${invoice.id}`}
-                                    title="Post actual invoice/bill to QuickBooks"
-                                  >
-                                    <FileDown size={14} />
-                                  </Button>
-                                </>
-                              )}
                               {!invoice.zohoBooksInvoiceId && (
                                 <>
                                   <Button

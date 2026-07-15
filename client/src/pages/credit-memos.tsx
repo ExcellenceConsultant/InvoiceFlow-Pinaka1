@@ -1493,28 +1493,6 @@ export default function CreditMemos() {
                                   <Check size={14} />
                                 </Button>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                }}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handlePostToQuickBooks(invoice.id, e);
-                                }}
-                                disabled={
-                                  postToQuickBooksMutation.isPending ||
-                                  !permissions.canPostToQuickBooks
-                                }
-                                data-testid={`button-post-to-quickbooks-${invoice.id}`}
-                                title="Post credit memo to QuickBooks"
-                              >
-                                <FileDown size={14} />
-                              </Button>
                               {!invoice.zohoCreditNoteId && (
                                 <Button
                                   variant="ghost"
