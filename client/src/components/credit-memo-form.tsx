@@ -29,7 +29,8 @@ import { z } from "zod";
 
 const DEFAULT_NOTES = `1. No return accepted of Frozen & Milk products Items-Its an Final Sale
 2. All returned checks are subject $50 surcharge
-3. All matters related to this invoice or the goods shall be governed by the State laws of New Jersey, and all disputes related here to shall be adjudicated exclusively in the state or federal courts located in New Jersey.`;
+3. All matters related to this invoice or the goods shall be governed by the State laws of New Jersey, and all disputes related here to shall be adjudicated exclusively in the state or federal courts located in New Jersey.
+4. Payment by Visa/Master/Amx Card (Credit Card Processing Surcharge will be - 3.5% - 4% ) on the total amount`;
 
 const creditMemoSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
