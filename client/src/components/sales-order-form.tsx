@@ -1,6 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Form,
   FormControl,
   FormField,
@@ -9,6 +17,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -22,8 +35,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Save, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Check, ChevronsUpDown, Plus, Save, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -64,6 +77,8 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
   const [lineItemsLoaded, setLineItemsLoaded] = useState(false);
   const [lineItemCategoryFilters, setLineItemCategoryFilters] = useState<string[]>([]);
   const [defaultCategoryFilter, setDefaultCategoryFilter] = useState<string>("all");
+  const [productPopoverOpen, setProductPopoverOpen] = useState<boolean[]>([]);
+  const [productSearchTerms, setProductSearchTerms] = useState<string[]>([]);
 
   const createEmptyLineItem = () => ({
     productId: "",
@@ -551,32 +566,101 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                 </div>
 
                 <div className="space-y-2">
-                  {lineItems.map((item, index) => (
+                  {lineItems.map((item, index) => {
+                    const isOpen = productPopoverOpen[index] ?? false;
+                    const searchTerm = productSearchTerms[index] ?? "";
+                    const categoryPool =
+                      defaultCategoryFilter === "all" || !defaultCategoryFilter
+                        ? sortedProducts
+                        : sortedProducts.filter(
+                            (p: any) => p.category === defaultCategoryFilter
+                          );
+                    const filteredProducts = searchTerm.trim()
+                      ? categoryPool.filter((p: any) => {
+                          const q = searchTerm.toLowerCase();
+                          return (
+                            (p.name || "").toLowerCase().includes(q) ||
+                            (p.itemCode || "").toLowerCase().includes(q)
+                          );
+                        })
+                      : categoryPool;
+                    const selectedProduct = products?.find(
+                      (p: any) => p.id === item.productId
+                    );
+
+                    const setOpen = (val: boolean) => {
+                      setProductPopoverOpen((prev) => {
+                        const next = [...prev];
+                        next[index] = val;
+                        return next;
+                      });
+                    };
+                    const setSearch = (val: string) => {
+                      setProductSearchTerms((prev) => {
+                        const next = [...prev];
+                        next[index] = val;
+                        return next;
+                      });
+                    };
+
+                    return (
                     <div
                       key={index}
                       className="grid grid-cols-12 gap-2 items-center"
                     >
                       <div className="col-span-5 space-y-1">
-                        <Select
-                          value={item.productId}
-                          onValueChange={(value) =>
-                            handleProductChange(index, value)
-                          }
-                        >
-                          <SelectTrigger data-testid={`select-product-${index}`}>
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(defaultCategoryFilter === "all" || !defaultCategoryFilter
-                              ? sortedProducts
-                              : sortedProducts?.filter((p: any) => p.category === defaultCategoryFilter)
-                            )?.map((product: any) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} ({product.itemCode || "No code"})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Popover open={isOpen} onOpenChange={setOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={isOpen}
+                              className="w-full justify-between font-normal h-10 px-3"
+                              data-testid={`select-product-${index}`}
+                            >
+                              <span className="truncate">
+                                {selectedProduct
+                                  ? `${selectedProduct.name} (${selectedProduct.itemCode || "No code"})`
+                                  : "Select product"}
+                              </span>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[400px] p-0" align="start">
+                            <Command shouldFilter={false}>
+                              <CommandInput
+                                placeholder="Search by name or SKU..."
+                                value={searchTerm}
+                                onValueChange={setSearch}
+                              />
+                              <CommandList>
+                                <CommandEmpty>No products found.</CommandEmpty>
+                                <CommandGroup>
+                                  {filteredProducts.map((product: any) => (
+                                    <CommandItem
+                                      key={product.id}
+                                      value={product.id}
+                                      onSelect={() => {
+                                        handleProductChange(index, product.id);
+                                        setSearch("");
+                                        setOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${item.productId === product.id ? "opacity-100" : "opacity-0"}`}
+                                      />
+                                      <span className="font-medium">{product.name}</span>
+                                      <span className="ml-2 text-muted-foreground text-xs">
+                                        {product.itemCode || "No code"}
+                                      </span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <div className="col-span-2">
                         <Input
@@ -623,7 +707,8 @@ export default function SalesOrderForm({ order, onClose, onSuccess }: Props) {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
 
                 {/* Add Item button below products */}
