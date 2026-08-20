@@ -235,6 +235,15 @@ export default function OrderPackingSlip() {
         text-align: center;
       }
 
+      .letter-footer {
+        text-align: center;
+        font-size: 13px;
+        margin-top: 30px;
+        padding-top: 10px;
+        border-top: 1px solid #ccc;
+        color: #333;
+      }
+
     `;
     document.head.appendChild(style);
     return () => {
@@ -570,6 +579,10 @@ export default function OrderPackingSlip() {
               </div>
             </>
           )}
+
+          <div className="letter-footer">
+            Warehouse Address : 140 Ethel Road West, Unit # H, Piscataway, NJ 08854
+          </div>
         </div>
       ))}
     </div>
