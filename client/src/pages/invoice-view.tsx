@@ -749,8 +749,8 @@ function InvoiceView() {
                 <tr>
                   <th style={{ width: "5%", textAlign: "center" }}>Sr. No.</th>
                   <th style={{ width: "12%" }}>Product Code</th>
-                  <th style={{ width: "12%" }}>Packing Size</th>
                   <th style={{ width: "35%" }}>Product Description</th>
+                  <th style={{ width: "12%" }}>Packing Size</th>
                   <th style={{ width: "10%", textAlign: "center" }}>
                     Qty
                     <br />
@@ -799,7 +799,7 @@ function InvoiceView() {
                       </tr>
                     );
                   } else if (row.type === "schemeName") {
-                    // Scheme name row (starts from Packing Size column)
+                    // Scheme name row (starts from Product Description column)
                     return (
                       <tr
                         key={`scheme-name-${pageIndex}-${idx}`}
@@ -833,6 +833,7 @@ function InvoiceView() {
                           {row.isScheme ? "" : row.srNo}
                         </td>
                         <td>{item.productCode || (row.isScheme ? "" : "—")}</td>
+                        <td>{item.description}</td>
                         <td>
                           {item.packingSize
                             ? item.packingSize.replace(/GM/g, "G")
@@ -840,7 +841,6 @@ function InvoiceView() {
                               ? ""
                               : "—"}
                         </td>
-                        <td>{item.description}</td>
                         <td style={{ textAlign: "center" }}>{qty || "—"}</td>
                         <td style={{ textAlign: "center" }}>
                           {formatCurrency(rate)}
