@@ -71,6 +71,7 @@ type SortConfig = {
 
 type DateFilterOption =
   | "all"
+  | "today"
   | "last_month"
   | "last_30_days"
   | "this_quarter"
@@ -147,6 +148,8 @@ const calculateDateRange = (
   switch (option) {
     case "all":
       return { start: null, end: null };
+    case "today":
+      return { start: startOfDay(now), end: endOfDay(now) };
     case "last_month": {
       const start = startOfDay(
         new Date(now.getFullYear(), now.getMonth() - 1, 1),
@@ -345,6 +348,7 @@ export default function Business() {
 
     const options: { value: DateFilterOption; label: string }[] = [
       { value: "all", label: "All dates" },
+      { value: "today", label: "Today" },
       { value: "last_month", label: "Last month" },
       { value: "last_30_days", label: "Last 30 days" },
       { value: "this_quarter", label: "This quarter" },
