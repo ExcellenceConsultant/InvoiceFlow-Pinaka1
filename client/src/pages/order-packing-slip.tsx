@@ -12,8 +12,6 @@ interface OrderLineItem {
   packingSize: string;
   description: string;
   quantity: number;
-  unitPrice: number;
-  lineTotal: number;
   category: string;
   netWeightKgs: number;
   grossWeightKgs: number;
@@ -27,10 +25,6 @@ interface Order {
   customerId: string;
   purchaseOrder?: string;
   notes?: string;
-  subtotal: string;
-  freight: string;
-  discount: string;
-  total: string;
 }
 
 interface Customer {
@@ -227,44 +221,6 @@ export default function OrderPackingSlip() {
         border-right: none;
       }
 
-      .totals-section {
-        margin-top: 12px;
-        font-size: 13px;
-      }
-
-      .totals-row {
-        display: flex;
-        justify-content: flex-end;
-        padding: 3px 0;
-      }
-
-      .totals-label {
-        width: 120px;
-        text-align: right;
-        padding-right: 15px;
-      }
-
-      .totals-value {
-        width: 100px;
-        text-align: right;
-      }
-
-      .totals-grand {
-        font-weight: 700;
-        font-size: 14px;
-        border-top: 2px solid #333;
-        padding-top: 5px;
-        margin-top: 3px;
-      }
-
-      .totals-cartons-row {
-        display: flex;
-        justify-content: flex-start;
-        padding: 3px 0;
-        font-weight: 700;
-        font-size: 13px;
-      }
-
       .signature-section {
         margin-top: 34px;
         display: flex;
@@ -279,14 +235,6 @@ export default function OrderPackingSlip() {
         text-align: center;
       }
 
-      .letter-footer {
-        text-align: center;
-        font-size: 13px;
-        margin-top: 30px;
-        padding-top: 10px;
-        border-top: 1px solid #ccc;
-        color: #333;
-      }
     `;
     document.head.appendChild(style);
     return () => {
@@ -369,10 +317,8 @@ export default function OrderPackingSlip() {
     });
   });
 
-  // The letterhead, totals, and signature line need the same A4 spacing as the
-  // purchase-order layout.
-  const ROWS_PER_PAGE = 22;
-  const MAX_ROWS_SINGLE_PAGE = 22;
+  const ROWS_PER_PAGE = 25;
+  const MAX_ROWS_SINGLE_PAGE = 25;
   const totalRows = allRows.length;
 
   const pages: {
@@ -447,13 +393,6 @@ export default function OrderPackingSlip() {
     pages.push({ rows: [], emptyCount: 0, showSummary: true });
   }
 
-  const formatCurrency = (value: number) =>
-    `$${value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
-  const subtotal = parseFloat(String(order.subtotal ?? 0)) || 0;
-  const freight = parseFloat(String(order.freight ?? 0)) || 0;
-  const discount = parseFloat(String(order.discount ?? 0)) || 0;
-  const total = parseFloat(String(order.total ?? 0)) || 0;
-
   return (
     <div className="container max-w-6xl mx-auto p-6">
       {/* Header with Back and Print buttons */}
@@ -505,13 +444,13 @@ export default function OrderPackingSlip() {
             <div style={{ width: "80px", flexShrink: 0 }} />
           </div>
 
-          <div className="invoice-header">SALES ORDER</div>
+          <div className="invoice-header">PACKING SLIP</div>
 
           {/* Info Grid */}
           <div className="invoice-info-grid">
-            {/* Customer */}
+            {/* Billed To */}
             <div className="info-section">
-              <div className="info-label">CUSTOMER:</div>
+              <div className="info-label">BILLED TO:</div>
               <div className="info-company">
                 {customer?.name || "—"}
               </div>
@@ -562,7 +501,7 @@ export default function OrderPackingSlip() {
             {/* Order Details */}
             <div className="info-section">
               <div className="info-detail">
-                <strong>Sales Order No.</strong> : {order.orderNumber}
+                <strong>Order No.</strong> : {order.orderNumber}
               </div>
               <div className="info-detail">
                 <strong>Order Date</strong> :{" "}
@@ -581,13 +520,11 @@ export default function OrderPackingSlip() {
           <table className="packing-table">
             <thead>
               <tr>
-                <th style={{ width: "6%" }}>Sr No.</th>
-                <th style={{ width: "12%" }}>Item Code</th>
-                <th style={{ width: "35%" }}>Product Description</th>
-                <th style={{ width: "13%" }}>Packing Size</th>
-                <th style={{ width: "10%", textAlign: "center" }}>Qty</th>
-                <th style={{ width: "12%", textAlign: "right" }}>Unit Price</th>
-                <th style={{ width: "12%", textAlign: "right" }}>Amount</th>
+                <th style={{ width: "8%" }}>Sr No.</th>
+                <th style={{ width: "15%" }}>Item Code</th>
+                <th style={{ width: "45%" }}>Product Description</th>
+                <th style={{ width: "17%" }}>Packing Size</th>
+                <th style={{ width: "15%" }}>Quantity (Carton)</th>
               </tr>
             </thead>
             <tbody>
@@ -598,17 +535,12 @@ export default function OrderPackingSlip() {
                       key={`cat-${pageIndex}-${idx}`}
                       className="category-row"
                     >
-                      <td colSpan={7} className="category-header">
+                      <td colSpan={5} className="category-header">
                         {row.category}
                       </td>
                     </tr>
                   );
                 } else {
-                  const unitPrice =
-                    parseFloat(String(row.item.unitPrice)) || 0;
-                  const lineTotal =
-                    parseFloat(String(row.item.lineTotal)) || 0;
-
                   return (
                     <tr key={`item-${pageIndex}-${idx}`}>
                       <td className="text-center">{row.srNo}</td>
@@ -620,12 +552,6 @@ export default function OrderPackingSlip() {
                           : "—"}
                       </td>
                       <td className="text-center">{row.item.quantity}</td>
-                      <td style={{ textAlign: "right" }}>
-                        {formatCurrency(unitPrice)}
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        {formatCurrency(lineTotal)}
-                      </td>
                     </tr>
                   );
                 }
@@ -633,47 +559,17 @@ export default function OrderPackingSlip() {
             </tbody>
           </table>
 
-          {/* Total Summary - only show on the final page */}
+          {/* Packing summary and signature - only show on the final page */}
           {page.showSummary && (
             <>
-              <div className="totals-section">
-                <div className="totals-cartons-row">
-                  Total Cartons: {totalCartons}
-                </div>
-                <div className="totals-row">
-                  <div className="totals-label">Subtotal:</div>
-                  <div className="totals-value">{formatCurrency(subtotal)}</div>
-                </div>
-                {freight > 0 && (
-                  <div className="totals-row">
-                    <div className="totals-label">Freight:</div>
-                    <div className="totals-value">
-                      {formatCurrency(freight)}
-                    </div>
-                  </div>
-                )}
-                {discount > 0 && (
-                  <div className="totals-row">
-                    <div className="totals-label">Discount:</div>
-                    <div className="totals-value">
-                      -{formatCurrency(discount)}
-                    </div>
-                  </div>
-                )}
-                <div className="totals-row totals-grand">
-                  <div className="totals-label">Total Amount:</div>
-                  <div className="totals-value">{formatCurrency(total)}</div>
-                </div>
+              <div className="mt-4">
+                <strong>Total Carton: {totalCartons}</strong>
               </div>
               <div className="signature-section">
                 <div className="signature-line">Authorized Signature</div>
               </div>
             </>
           )}
-
-          <div className="letter-footer">
-            Warehouse Address : 140 Ethel Road West, Unit # H, Piscataway, NJ 08854
-          </div>
         </div>
       ))}
     </div>
