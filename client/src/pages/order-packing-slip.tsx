@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { formatDateWithoutTimezone } from "@/lib/dateUtils";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Globe, Mail, Phone, Printer } from "lucide-react";
 import { useEffect } from "react";
 import { Link, useParams } from "wouter";
+import pinakaLogo from "@/assets/pinaka-logo.jpg";
 
 interface OrderLineItem {
   id: string;
@@ -11,6 +12,8 @@ interface OrderLineItem {
   packingSize: string;
   description: string;
   quantity: number;
+  unitPrice: number;
+  lineTotal: number;
   category: string;
   netWeightKgs: number;
   grossWeightKgs: number;
@@ -24,6 +27,10 @@ interface Order {
   customerId: string;
   purchaseOrder?: string;
   notes?: string;
+  subtotal: string;
+  freight: string;
+  discount: string;
+  total: string;
 }
 
 interface Customer {
@@ -57,8 +64,8 @@ export default function OrderPackingSlip() {
     style.id = "packing-slip-print-styles";
     style.textContent = `
       @media print {
-        @page { 
-          size: A4; 
+        @page {
+          size: A4;
           margin: 10mm 10mm 10mm 10mm;
           background: white;
         }
@@ -71,18 +78,19 @@ export default function OrderPackingSlip() {
         .page-break { page-break-after: always; }
         .print-hide { display: none !important; }
         .print-hide-content { display: none !important; }
-
-        .category-header {
-          background-color: #f9f9f9 !important;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-
+        .category-header,
         .packing-table th {
-          background-color: #f5f5f5 !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
+        .category-header { background-color: #f9f9f9 !important; }
+        .packing-table th { background-color: #f5f5f5 !important; }
+        .letterhead-logo,
+        .letterhead-company {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .letterhead-company { color: #2e7d32 !important; }
       }
 
       .packing-list-page {
@@ -94,6 +102,54 @@ export default function OrderPackingSlip() {
         max-width: 210mm;
         margin: 0 auto;
         position: relative;
+      }
+
+      .letterhead-header {
+        display: flex;
+        align-items: center;
+        padding-bottom: 14px;
+        margin-bottom: 16px;
+        border-bottom: 2px solid #ddd;
+      }
+
+      .letterhead-logo {
+        width: 80px;
+        height: 80px;
+        object-fit: contain;
+        margin-right: 24px;
+        flex-shrink: 0;
+      }
+
+      .letterhead-info {
+        flex: 1;
+        text-align: center;
+      }
+
+      .letterhead-company {
+        font-size: 20px;
+        font-weight: bold;
+        color: #2e7d32;
+        margin-bottom: 3px;
+      }
+
+      .letterhead-address {
+        font-size: 12px;
+        color: #555;
+        margin-bottom: 6px;
+      }
+
+      .letterhead-contact {
+        font-size: 11px;
+        color: #333;
+        display: flex;
+        justify-content: center;
+        gap: 18px;
+      }
+
+      .contact-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
       }
 
       .invoice-header {
@@ -111,9 +167,7 @@ export default function OrderPackingSlip() {
         font-size: 13px;
       }
 
-      .info-section {
-        line-height: 1.6;
-      }
+      .info-section { line-height: 1.6; }
 
       .info-label {
         font-weight: bold;
@@ -173,21 +227,65 @@ export default function OrderPackingSlip() {
         border-right: none;
       }
 
-      .totals-row { 
-        font-weight: 600; 
-        margin-top: 12px; 
+      .totals-section {
+        margin-top: 12px;
+        font-size: 13px;
       }
 
-      .letter-head {
+      .totals-row {
+        display: flex;
+        justify-content: flex-end;
+        padding: 3px 0;
+      }
+
+      .totals-label {
+        width: 120px;
+        text-align: right;
+        padding-right: 15px;
+      }
+
+      .totals-value {
+        width: 100px;
+        text-align: right;
+      }
+
+      .totals-grand {
+        font-weight: 700;
+        font-size: 14px;
+        border-top: 2px solid #333;
+        padding-top: 5px;
+        margin-top: 3px;
+      }
+
+      .totals-cartons-row {
+        display: flex;
+        justify-content: flex-start;
+        padding: 3px 0;
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      .signature-section {
+        margin-top: 34px;
+        display: flex;
+        justify-content: flex-end;
+        font-size: 12px;
+      }
+
+      .signature-line {
+        width: 220px;
+        padding-top: 8px;
+        border-top: 1px solid #333;
         text-align: center;
-        font-size: 16px;
-        margin-bottom: 20px;
       }
 
       .letter-footer {
         text-align: center;
-        font-size: 16px;
+        font-size: 13px;
         margin-top: 30px;
+        padding-top: 10px;
+        border-top: 1px solid #ccc;
+        color: #333;
       }
     `;
     document.head.appendChild(style);
@@ -271,10 +369,10 @@ export default function OrderPackingSlip() {
     });
   });
 
-  // Dynamic Pagination: Optimized for A4 with 10mm margins
-  // Set rows per page to 25 for optimal viewing and printing (prevents overflow)
-  const ROWS_PER_PAGE = 25;
-  const MAX_ROWS_SINGLE_PAGE = 25; // Max rows that fit on one page with summary
+  // The letterhead, totals, and signature line need the same A4 spacing as the
+  // purchase-order layout.
+  const ROWS_PER_PAGE = 22;
+  const MAX_ROWS_SINGLE_PAGE = 22;
   const totalRows = allRows.length;
 
   const pages: {
@@ -349,6 +447,13 @@ export default function OrderPackingSlip() {
     pages.push({ rows: [], emptyCount: 0, showSummary: true });
   }
 
+  const formatCurrency = (value: number) =>
+    `$${value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+  const subtotal = parseFloat(String(order.subtotal ?? 0)) || 0;
+  const freight = parseFloat(String(order.freight ?? 0)) || 0;
+  const discount = parseFloat(String(order.discount ?? 0)) || 0;
+  const total = parseFloat(String(order.total ?? 0)) || 0;
+
   return (
     <div className="container max-w-6xl mx-auto p-6">
       {/* Header with Back and Print buttons */}
@@ -373,14 +478,40 @@ export default function OrderPackingSlip() {
             pageIndex < pages.length - 1 ? "page-break" : ""
           }`}
         >
-          {/* Header */}
-          <div className="invoice-header">PACKING SLIP</div>
+          {/* Letterhead Header */}
+          <div className="letterhead-header">
+            <img
+              src={pinakaLogo}
+              alt="Pinaka Foods"
+              className="letterhead-logo"
+            />
+            <div className="letterhead-info">
+              <div className="letterhead-company">Pinaka Foods, Inc.</div>
+              <div className="letterhead-address">
+                5103 Custer St, Piscataway, NJ 08854-4703
+              </div>
+              <div className="letterhead-contact">
+                <span className="contact-item">
+                  <Phone size={11} /> +1 (908) 217-5834
+                </span>
+                <span className="contact-item">
+                  <Mail size={11} /> sales@pinakafoods.com
+                </span>
+                <span className="contact-item">
+                  <Globe size={11} /> www.pinakafoods.com
+                </span>
+              </div>
+            </div>
+            <div style={{ width: "80px", flexShrink: 0 }} />
+          </div>
+
+          <div className="invoice-header">SALES ORDER</div>
 
           {/* Info Grid */}
           <div className="invoice-info-grid">
-            {/* Billed To */}
+            {/* Customer */}
             <div className="info-section">
-              <div className="info-label">BILLED TO:</div>
+              <div className="info-label">CUSTOMER:</div>
               <div className="info-company">
                 {customer?.name || "—"}
               </div>
@@ -431,7 +562,7 @@ export default function OrderPackingSlip() {
             {/* Order Details */}
             <div className="info-section">
               <div className="info-detail">
-                <strong>Order No.</strong> : {order.orderNumber}
+                <strong>Sales Order No.</strong> : {order.orderNumber}
               </div>
               <div className="info-detail">
                 <strong>Order Date</strong> :{" "}
@@ -450,11 +581,13 @@ export default function OrderPackingSlip() {
           <table className="packing-table">
             <thead>
               <tr>
-                <th style={{ width: "8%" }}>Sr No.</th>
-                <th style={{ width: "15%" }}>Item Code</th>
-                <th style={{ width: "45%" }}>Product Description</th>
-                <th style={{ width: "17%" }}>Packing Size</th>
-                <th style={{ width: "15%" }}>Quantity (Carton)</th>
+                <th style={{ width: "6%" }}>Sr No.</th>
+                <th style={{ width: "12%" }}>Item Code</th>
+                <th style={{ width: "35%" }}>Product Description</th>
+                <th style={{ width: "13%" }}>Packing Size</th>
+                <th style={{ width: "10%", textAlign: "center" }}>Qty</th>
+                <th style={{ width: "12%", textAlign: "right" }}>Unit Price</th>
+                <th style={{ width: "12%", textAlign: "right" }}>Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -465,12 +598,17 @@ export default function OrderPackingSlip() {
                       key={`cat-${pageIndex}-${idx}`}
                       className="category-row"
                     >
-                      <td colSpan={5} className="category-header">
+                      <td colSpan={7} className="category-header">
                         {row.category}
                       </td>
                     </tr>
                   );
                 } else {
+                  const unitPrice =
+                    parseFloat(String(row.item.unitPrice)) || 0;
+                  const lineTotal =
+                    parseFloat(String(row.item.lineTotal)) || 0;
+
                   return (
                     <tr key={`item-${pageIndex}-${idx}`}>
                       <td className="text-center">{row.srNo}</td>
@@ -482,6 +620,12 @@ export default function OrderPackingSlip() {
                           : "—"}
                       </td>
                       <td className="text-center">{row.item.quantity}</td>
+                      <td style={{ textAlign: "right" }}>
+                        {formatCurrency(unitPrice)}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        {formatCurrency(lineTotal)}
+                      </td>
                     </tr>
                   );
                 }
@@ -489,18 +633,46 @@ export default function OrderPackingSlip() {
             </tbody>
           </table>
 
-          {/* Total Summary - only show on pages with showSummary */}
+          {/* Total Summary - only show on the final page */}
           {page.showSummary && (
-            <div className="text-right mt-4 space-y-1">
-              <div>
-                <strong>Total Carton: {totalCartons}</strong>
+            <>
+              <div className="totals-section">
+                <div className="totals-cartons-row">
+                  Total Cartons: {totalCartons}
+                </div>
+                <div className="totals-row">
+                  <div className="totals-label">Subtotal:</div>
+                  <div className="totals-value">{formatCurrency(subtotal)}</div>
+                </div>
+                {freight > 0 && (
+                  <div className="totals-row">
+                    <div className="totals-label">Freight:</div>
+                    <div className="totals-value">
+                      {formatCurrency(freight)}
+                    </div>
+                  </div>
+                )}
+                {discount > 0 && (
+                  <div className="totals-row">
+                    <div className="totals-label">Discount:</div>
+                    <div className="totals-value">
+                      -{formatCurrency(discount)}
+                    </div>
+                  </div>
+                )}
+                <div className="totals-row totals-grand">
+                  <div className="totals-label">Total Amount:</div>
+                  <div className="totals-value">{formatCurrency(total)}</div>
+                </div>
               </div>
-            </div>
+              <div className="signature-section">
+                <div className="signature-line">Authorized Signature</div>
+              </div>
+            </>
           )}
 
-          {/* Letter Head Footer - hidden during print */}
-          <div className="letter-footer print-hide-content">
-            <strong>Letter Head Footer</strong>
+          <div className="letter-footer">
+            Warehouse Address : 140 Ethel Road West, Unit # H, Piscataway, NJ 08854
           </div>
         </div>
       ))}
