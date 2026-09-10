@@ -114,7 +114,7 @@ export default function PurchaseOrderView() {
 
       .po-header {
         text-align: center;
-        font-size: 28px;
+        font-size: 24px;
         font-weight: bold;
         margin-bottom: 20px;
       }
