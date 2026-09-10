@@ -148,7 +148,7 @@ export default function OrderPackingSlip() {
 
       .invoice-header {
         text-align: center;
-        font-size: 28px;
+        font-size: 24px;
         font-weight: bold;
         margin-bottom: 20px;
       }
@@ -453,7 +453,7 @@ export default function OrderPackingSlip() {
             <div style={{ width: "80px", flexShrink: 0 }} />
           </div>
 
-          <div className="invoice-header">PACKING SLIP</div>
+          <div className="invoice-header">Sales Order / Packing List</div>
 
           {/* Info Grid */}
           <div className="invoice-info-grid">
